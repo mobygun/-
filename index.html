@@ -10,6 +10,8 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <title>현장 경비 지출대장</title>
+<script src="./template.js"></script>
+<script src="./xlsxbuild.js"></script>
 <style>
   :root{
     --paper:#EEEBE1; --card:#FFFFFF; --ink:#20221B; --muted:#736C58;
@@ -182,8 +184,6 @@ const KEY_E = "gyeongbi_entries", KEY_S = "gyeongbi_settings";
 let entries = [], settings = {siteName:"",dept:"",cardNumber:"",writer:""};
 let selectedPay = "법인카드", editingId = null, pendingAction = null;
 
-const COMPANY = { name:"㈜티에스코어", addr:"서울시 강서구 마곡중앙1로 72 606호(마곡동, 엠타워)", tel:"T 02-6951-5541 / F 02-6951-554" };
-
 function todayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function fmtWon(n){return Number(n||0).toLocaleString("ko-KR");}
 function monthOf(s){return s?s.slice(0,7):"";}
@@ -212,7 +212,7 @@ function renderHeader(){
 function allMonths(){const s=new Set(entries.map(e=>monthOf(e.date)));s.add(monthOf(todayStr()));return [...s].sort().reverse();}
 function renderMonths(){
   const prev=monthSelect.value, ms=allMonths();
-  monthSelect.innerHTML = ms.map(m=>{const[y,mo]=m.split("-");return `<option value="${m}">${y}년 ${Number(mo)}월</option>`;}).join("");
+  monthSelect.innerHTML = ms.map(m=>{const[y,mo]=m.split("-");return '<option value="'+m+'">'+y+'년 '+Number(mo)+'월</option>';}).join("");
   monthSelect.value = ms.includes(prev)?prev:monthOf(todayStr());
 }
 function curList(){const m=monthSelect.value;return entries.filter(e=>monthOf(e.date)===m).sort((a,b)=>a.date.localeCompare(b.date));}
@@ -221,25 +221,25 @@ function render(){
   const list=curList();
   entryCount.textContent=list.length+"건";
   ledger.innerHTML = list.length===0
-    ? `<div class="empty">이 달 기록이 아직 없어요.<br>위에서 입력해보세요.</div>`
-    : list.map(e=>`<div class="entry" data-id="${e.id}">
-        <div class="date">${e.date.slice(5).replace("-",".")}</div>
-        <div class="mid">
-          <div class="cat">${esc(e.cat)}</div>
-          <div class="vendor">${esc(e.vendor)}</div>
-          ${e.note?`<div class="note">${esc(e.note)}</div>`:""}
-          <span class="tag ${e.pay==="법인카드"?"corp":"cash"}">${esc(e.pay)}</span>
-        </div>
-        <div class="right">
-          <div class="amt">${fmtWon(e.amount)}원</div>
-          <button class="del" data-act="del" data-id="${e.id}">삭제</button>
-        </div></div>`).join("");
+    ? '<div class="empty">이 달 기록이 아직 없어요.<br>위에서 입력해보세요.</div>'
+    : list.map(e=>'<div class="entry" data-id="'+e.id+'">'+
+        '<div class="date">'+e.date.slice(5).replace("-",".")+'</div>'+
+        '<div class="mid">'+
+          '<div class="cat">'+esc(e.cat)+'</div>'+
+          '<div class="vendor">'+esc(e.vendor)+'</div>'+
+          (e.note?'<div class="note">'+esc(e.note)+'</div>':"")+
+          '<span class="tag '+(e.pay==="법인카드"?"corp":"cash")+'">'+esc(e.pay)+'</span>'+
+        '</div>'+
+        '<div class="right">'+
+          '<div class="amt">'+fmtWon(e.amount)+'원</div>'+
+          '<button class="del" data-act="del" data-id="'+e.id+'">삭제</button>'+
+        '</div></div>').join("");
   const corp=list.filter(e=>e.pay==="법인카드").reduce((s,e)=>s+ +e.amount,0);
   const cash=list.filter(e=>e.pay!=="법인카드").reduce((s,e)=>s+ +e.amount,0);
-  totals.innerHTML=`
-    <div class="line"><span>소계 (법인카드)</span><span class="val">${fmtWon(corp)}원</span></div>
-    <div class="line"><span>소계 (현금/개인카드)</span><span class="val">${fmtWon(cash)}원</span></div>
-    <div class="line grand"><span>합계</span><span class="val">${fmtWon(corp+cash)}원</span></div>`;
+  totals.innerHTML=
+    '<div class="line"><span>소계 (법인카드)</span><span class="val">'+fmtWon(corp)+'원</span></div>'+
+    '<div class="line"><span>소계 (현금/개인카드)</span><span class="val">'+fmtWon(cash)+'원</span></div>'+
+    '<div class="line grand"><span>합계</span><span class="val">'+fmtWon(corp+cash)+'원</span></div>';
   renderHeader();
   ledger.querySelectorAll('[data-act="del"]').forEach(b=>b.onclick=(ev)=>{
     ev.stopPropagation();
@@ -287,9 +287,14 @@ addBtn.onclick=()=>{
 cancelEditBtn.onclick=stopEdit;
 monthSelect.onchange=render;
 
+function dl(blob,name){
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=url; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1500);
+}
 exportJsonBtn.onclick=()=>{
   const blob=new Blob([JSON.stringify({entries,settings},null,2)],{type:"application/json"});
-  dl(blob, `경비기록_백업_${todayStr()}.json`);
+  dl(blob, "경비기록_백업_"+todayStr()+".json");
 };
 importJsonBtn.onclick=()=>importFile.click();
 importFile.onchange=(ev)=>{
@@ -302,7 +307,7 @@ importFile.onchange=(ev)=>{
       if(!confirm("백업 파일의 기록으로 되살릴까요? 지금 기록에 합쳐집니다.")) return;
       const ids=new Set(entries.map(e=>e.id));
       d.entries.forEach(e=>{ if(!ids.has(e.id)) entries.push(e); });
-      if(d.settings) { settings=d.settings; saveSettings(); }
+      if(d.settings){ settings=d.settings; saveSettings(); }
       saveEntries(); load();
       alert("복원됐어요.");
     }catch(e){ alert("이 파일은 백업 파일이 아닌 것 같아요."); }
@@ -313,76 +318,7 @@ importFile.onchange=(ev)=>{
 
 function defaultName(){
   const [y,mo]=monthSelect.value.split("-");
-  return `TSC-01-001_${y}_${Number(mo)}월_경비_${settings.writer||"본인이름"}`;
-}
-function buildExcelHtml(){
-  const list=curList(), [y,mo]=monthSelect.value.split("-"), mn=Number(mo);
-  const ds=list.map(e=>e.date);
-  const s=ds.length?ds[0].slice(8):"00", en=ds.length?ds[ds.length-1].slice(8):"00";
-  const corp=list.filter(e=>e.pay==="법인카드").reduce((a,e)=>a+ +e.amount,0);
-  const cash=list.filter(e=>e.pay!=="법인카드").reduce((a,e)=>a+ +e.amount,0);
-  const MINROWS=32, rows=Math.max(list.length,MINROWS);
-  const B="border:1px solid #000;";
-  const CEN="text-align:center;vertical-align:middle;";
-  let body="";
-  for(let i=0;i<rows;i++){
-    const e=list[i];
-    body+=`<tr style="height:22px">
-      <td style="${B}${CEN}font-size:10pt">${e?e.date.slice(5).replace("-","/"):""}</td>
-      <td style="${B}${CEN}font-size:9pt">${e?esc(e.cat):""}</td>
-      <td style="${B}padding-left:6px;font-size:10pt">${e?esc(e.vendor):""}</td>
-      <td style="${B}text-align:right;padding-right:6px;mso-number-format:'\\#\\,\\#\\#0'">${e&&e.pay==="법인카드"?e.amount:""}</td>
-      <td style="${B}text-align:right;padding-right:6px;mso-number-format:'\\#\\,\\#\\#0'">${e&&e.pay!=="법인카드"?e.amount:""}</td>
-      <td style="${B}padding-left:6px;font-size:9pt">${e?esc(e.note):""}</td></tr>`;
-  }
-  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
-<head><meta charset="UTF-8">
-<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
-<x:Name>${mn}월 상세내역</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
-</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
-</head><body>
-<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-family:맑은 고딕,Malgun Gothic;font-size:10pt">
-<col width="70"><col width="130"><col width="230"><col width="95"><col width="95"><col width="150">
-<tr style="height:20px"><td colspan="5"></td><td style="text-align:right;color:#C00000;font-size:9pt">TSC-01-001</td></tr>
-<tr style="height:34px"><td colspan="6" style="${CEN}font-size:16pt;font-weight:bold">( ${mn} )월 현장 경비 지출대장</td></tr>
-<tr style="height:22px"><td colspan="6" style="${CEN}font-size:11pt">[${y}. ${mo}. ${s} ~ ${mo}. ${en}]</td></tr>
-<tr style="height:14px"><td colspan="6"></td></tr>
-<tr style="height:24px">
-  <td style="font-weight:bold;font-size:10pt">현 장 명 :</td><td colspan="2" style="padding-left:6px">${esc(settings.siteName)}</td>
-  <td style="font-weight:bold;text-align:right;font-size:10pt">부 서 명 :</td><td colspan="2" style="padding-left:10px">${esc(settings.dept)}</td></tr>
-<tr style="height:24px">
-  <td style="font-weight:bold;font-size:10pt">카드번호 :</td><td colspan="2" style="padding-left:6px">${esc(settings.cardNumber)}</td>
-  <td style="font-weight:bold;text-align:right;font-size:10pt">작 성 자 :</td><td colspan="2" style="padding-left:10px">${esc(settings.writer)}</td></tr>
-<tr style="height:16px"><td colspan="6"></td></tr>
-<tr style="height:24px;background:#F2F2F2">
-  <td rowspan="2" style="${B}${CEN}font-weight:bold">날짜</td>
-  <td rowspan="2" style="${B}${CEN}font-weight:bold">계정과목</td>
-  <td rowspan="2" style="${B}${CEN}font-weight:bold">사용처</td>
-  <td colspan="2" style="${B}${CEN}font-weight:bold">금　액</td>
-  <td rowspan="2" style="${B}${CEN}font-weight:bold">비　고</td></tr>
-<tr style="height:22px;background:#F2F2F2">
-  <td style="${B}${CEN}font-weight:bold;font-size:9pt">법인카드</td>
-  <td style="${B}${CEN}font-weight:bold;font-size:9pt">현금/개인카드</td></tr>
-${body}
-<tr style="height:26px;background:#F2F2F2">
-  <td colspan="3" style="${B}${CEN}font-weight:bold">소　　　계</td>
-  <td style="${B}text-align:right;padding-right:6px;font-weight:bold;mso-number-format:'\\#\\,\\#\\#0'">${corp}</td>
-  <td style="${B}text-align:right;padding-right:6px;font-weight:bold;mso-number-format:'\\#\\,\\#\\#0'">${cash}</td>
-  <td style="${B}"></td></tr>
-<tr style="height:26px;background:#F2F2F2">
-  <td colspan="3" style="${B}${CEN}font-weight:bold">합　　　계</td>
-  <td colspan="2" style="${B}text-align:right;padding-right:6px;font-weight:bold;mso-number-format:'\\#\\,\\#\\#0'">${corp+cash}</td>
-  <td style="${B}"></td></tr>
-<tr style="height:30px"><td colspan="6"></td></tr>
-<tr style="height:18px"><td colspan="6" style="${CEN}font-size:9pt;font-weight:bold">${COMPANY.name}</td></tr>
-<tr style="height:16px"><td colspan="6" style="${CEN}font-size:8pt">${COMPANY.addr}</td></tr>
-<tr style="height:16px"><td colspan="6" style="${CEN}font-size:8pt">${COMPANY.tel}</td></tr>
-</table></body></html>`;
-}
-function dl(blob,name){
-  const url=URL.createObjectURL(blob), a=document.createElement("a");
-  a.href=url; a.download=name; document.body.appendChild(a); a.click();
-  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1500);
+  return y+"_"+Number(mo)+"월_경비_"+(settings.writer||"본인이름");
 }
 function openModal(act){
   pendingAction=act;
@@ -392,12 +328,18 @@ function openModal(act){
 }
 modalCancel.onclick=()=>nameModalBg.classList.remove("open");
 modalOk.onclick=async()=>{
-  const name=(fileNameInput.value.trim()||defaultName())+".xls";
+  const name=(fileNameInput.value.trim()||defaultName())+".xlsx";
   nameModalBg.classList.remove("open");
-  const html=buildExcelHtml();
-  const blob=new Blob(["\ufeff"+html],{type:"application/vnd.ms-excel;charset=utf-8"});
+  const [y,mo]=monthSelect.value.split("-");
+  let blob;
+  try{
+    blob = window.buildExpenseXlsx(curList(), settings, y, Number(mo));
+  }catch(err){
+    alert("엑셀을 만들지 못했어요. 앱을 완전히 껐다가 다시 열어주세요.");
+    return;
+  }
   if(pendingAction==="share"){
-    const file=new File([blob],name,{type:"application/vnd.ms-excel"});
+    const file=new File([blob],name,{type:blob.type});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
       try{ await navigator.share({files:[file],title:name}); return; }catch(e){ return; }
     }
