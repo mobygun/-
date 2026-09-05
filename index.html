@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#20221B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="경비대장">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>현장 경비 지출대장</title>
+<style>
+  :root{
+    --paper:#EEEBE1; --card:#FFFFFF; --ink:#20221B; --muted:#736C58;
+    --line:#CBC3AF; --accent:#D6540A; --danger:#B3261E;
+    --corp:#1F5F4F; --cash:#8A5A1E;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--paper);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+    -webkit-tap-highlight-color:transparent;padding-bottom:100px;}
+  .wrap{max-width:520px;margin:0 auto;padding:0 14px;}
+  header.top{background:var(--ink);color:#F4F1E8;padding:calc(16px + env(safe-area-inset-top)) 14px 16px;margin-bottom:14px;}
+  header.top .inner{max-width:520px;margin:0 auto;display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+  header.top h1{font-size:19px;margin:0;font-weight:700;}
+  header.top .sub{font-size:12px;color:#C9C2AC;margin-top:2px;}
+  header.top button{background:none;border:1px solid #55523F;color:#EDEADF;border-radius:8px;padding:6px 10px;font-size:12px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;}
+  .card h2{font-size:13px;margin:0 0 10px;color:var(--muted);font-weight:600;}
+  .field{margin-bottom:10px;}
+  .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;}
+  .field input,.field select{width:100%;padding:11px 10px;border:1px solid var(--line);border-radius:8px;
+    font-size:16px;background:#FBFAF6;color:var(--ink);font-family:inherit;}
+  .row2{display:flex;gap:8px;}
+  .row2>.field{flex:1;min-width:0;}
+  .pay-group{display:flex;gap:6px;}
+  .pay-opt{flex:1;text-align:center;padding:11px 4px;border:1px solid var(--line);border-radius:8px;
+    font-size:13.5px;color:var(--muted);background:#FBFAF6;}
+  .pay-opt.active{background:var(--ink);color:#F4F1E8;border-color:var(--ink);}
+  #settingsPanel,#backupPanel{display:none;}
+  #settingsPanel.open,#backupPanel.open{display:block;}
+  .btn{width:100%;border:none;border-radius:9px;padding:13px;font-size:15px;font-weight:700;font-family:inherit;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-ghost{background:none;border:1px solid var(--line);color:var(--ink);font-weight:600;}
+  .monthbar{display:flex;align-items:center;justify-content:space-between;margin:4px 0 8px;}
+  .monthbar select{border:1px solid var(--line);border-radius:8px;padding:8px;background:#FBFAF6;font-size:14px;font-family:inherit;}
+  .monthbar .count{font-size:12px;color:var(--muted);}
+  .ledger{border-top:1px solid var(--line);}
+  .entry{display:flex;gap:8px;align-items:flex-start;padding:10px 2px;border-bottom:1px solid var(--line);}
+  .entry .date{width:44px;flex-shrink:0;font-size:12.5px;color:var(--muted);padding-top:1px;}
+  .entry .mid{flex:1;min-width:0;}
+  .entry .cat{font-size:13px;font-weight:600;}
+  .entry .vendor{font-size:12.5px;color:var(--muted);margin-top:1px;}
+  .entry .note{font-size:11.5px;color:var(--muted);margin-top:1px;font-style:italic;}
+  .entry .tag{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:5px;margin-top:3px;color:#fff;}
+  .tag.corp{background:var(--corp);} .tag.cash{background:var(--cash);}
+  .entry .right{text-align:right;flex-shrink:0;}
+  .entry .amt{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .entry .del{background:none;border:none;color:var(--danger);font-size:12px;padding:4px 0 0;font-family:inherit;}
+  .empty{padding:30px 4px;text-align:center;color:var(--muted);font-size:13px;}
+  .totals .line{display:flex;justify-content:space-between;padding:5px 2px;font-size:13.5px;}
+  .totals .line.grand{border-top:1px solid var(--ink);margin-top:4px;padding-top:9px;font-size:16px;font-weight:700;}
+  .totals .val{font-variant-numeric:tabular-nums;}
+  .actionbar{position:fixed;left:0;right:0;bottom:0;background:#F4F1E8;border-top:1px solid var(--line);
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));}
+  .actionbar .inner{max-width:520px;margin:0 auto;display:flex;gap:8px;}
+  .actionbar button{flex:1;}
+  .hint{font-size:11.5px;color:var(--muted);text-align:center;margin:6px 0 10px;line-height:1.5;}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;z-index:50;}
+  .modal-bg.open{display:flex;}
+  .modal{background:#fff;width:100%;max-width:520px;margin:0 auto;border-radius:14px 14px 0 0;
+    padding:16px 16px calc(16px + env(safe-area-inset-bottom));}
+  .modal h3{margin:0 0 10px;font-size:15px;}
+  .editbar{display:flex;gap:8px;}
+  .small{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="inner">
+    <div>
+      <h1 id="titleLine">현장 경비 지출대장</h1>
+      <div class="sub" id="subLine">불러오는 중…</div>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button id="backupBtn" type="button">백업</button>
+      <button id="settingsBtn" type="button">현장정보</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="card" id="settingsPanel">
+    <h2>현장 정보 (엑셀 상단에 자동으로 들어갑니다)</h2>
+    <div class="row2">
+      <div class="field"><label>현장명</label><input type="text" id="siteName" placeholder="예: 본사"></div>
+      <div class="field"><label>부서명</label><input type="text" id="dept" placeholder="예: 공무팀"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>카드번호</label><input type="text" id="cardNumber" placeholder="예: 1234"></div>
+      <div class="field"><label>작성자</label><input type="text" id="writer" placeholder="예: 홍길동"></div>
+    </div>
+    <button class="btn btn-ghost" id="saveSettingsBtn" type="button">저장</button>
+  </div>
+
+  <div class="card" id="backupPanel">
+    <h2>백업 · 복원</h2>
+    <button class="btn btn-ghost" id="exportJsonBtn" type="button" style="margin-bottom:8px;">기록 백업 파일 내려받기</button>
+    <button class="btn btn-ghost" id="importJsonBtn" type="button">백업 파일에서 되살리기</button>
+    <input type="file" id="importFile" accept=".json" style="display:none;">
+    <div class="small">폰을 바꾸거나 앱을 지우기 전에 백업 파일을 받아두면, 새 폰에서 그대로 되살릴 수 있어요.</div>
+  </div>
+
+  <div class="card">
+    <h2 id="formTitle">경비 입력</h2>
+    <div class="field"><label>날짜</label><input type="date" id="f_date"></div>
+    <div class="field"><label>계정과목</label>
+      <select id="f_cat">
+        <option value="식사(조식, 중식, 석식)">식사(조식, 중식, 석식)</option>
+        <option value="음료">음료</option>
+        <option value="협력업체, 업무관련 외부인 식사">협력업체, 업무관련 외부인 식사</option>
+        <option value="문구 구매">문구 구매</option>
+        <option value="출장 숙박비, 교통비">출장 숙박비, 교통비</option>
+        <option value="주유비, 고속도로 통행료">주유비, 고속도로 통행료</option>
+      </select>
+    </div>
+    <div class="row2">
+      <div class="field"><label>사용처</label><input type="text" id="f_vendor" placeholder="예: OO식당"></div>
+      <div class="field"><label>금액(원)</label><input type="number" id="f_amount" placeholder="15000" inputmode="numeric"></div>
+    </div>
+    <div class="field">
+      <label>결제수단</label>
+      <div class="pay-group" id="payGroup">
+        <div class="pay-opt active" data-v="법인카드">법인카드</div>
+        <div class="pay-opt" data-v="현금/개인카드">현금 · 개인카드</div>
+      </div>
+    </div>
+    <div class="field"><label>비고 (선택)</label><input type="text" id="f_note" placeholder="예: 참석자 3명, OO건설"></div>
+    <div class="editbar">
+      <button class="btn btn-primary" id="addBtn" type="button">추가</button>
+      <button class="btn btn-ghost" id="cancelEditBtn" type="button" style="display:none;">취소</button>
+    </div>
+  </div>
+
+  <div class="monthbar">
+    <select id="monthSelect"></select>
+    <div class="count" id="entryCount"></div>
+  </div>
+
+  <div class="card" style="padding:6px 12px 12px;">
+    <div class="ledger" id="ledger"></div>
+    <div class="totals" id="totals"></div>
+  </div>
+
+  <div class="hint">기록은 이 폰 안에 저장돼요. 인터넷이 없어도 열리고, 앱을 껐다 켜도 남아 있습니다.</div>
+</div>
+
+<div class="actionbar">
+  <div class="inner">
+    <button class="btn btn-ghost" id="shareBtn" type="button">공유하기</button>
+    <button class="btn btn-primary" id="exportBtn" type="button">엑셀 저장</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="nameModalBg">
+  <div class="modal">
+    <h3 id="modalTitle">파일 이름</h3>
+    <div class="field"><label>엑셀 파일 이름</label><input type="text" id="fileNameInput"></div>
+    <div class="editbar">
+      <button class="btn btn-ghost" id="modalCancel" type="button">취소</button>
+      <button class="btn btn-primary" id="modalOk" type="button">확인</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY_E = "gyeongbi_entries", KEY_S = "gyeongbi_settings";
+let entries = [], settings = {siteName:"",dept:"",cardNumber:"",writer:""};
+let selectedPay = "법인카드", editingId = null, pendingAction = null;
+
+const COMPANY = { name:"㈜티에스코어", addr:"서울시 강서구 마곡중앙1로 72 606호(마곡동, 엠타워)", tel:"T 02-6951-5541 / F 02-6951-554" };
+
+function todayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function fmtWon(n){return Number(n||0).toLocaleString("ko-KR");}
+function monthOf(s){return s?s.slice(0,7):"";}
+function uid(){return "e"+Date.now()+Math.random().toString(36).slice(2,7);}
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+function load(){
+  try{ entries = JSON.parse(localStorage.getItem(KEY_E)||"[]"); }catch(e){ entries=[]; }
+  try{ const s=localStorage.getItem(KEY_S); if(s) settings=JSON.parse(s); }catch(e){}
+  siteName.value=settings.siteName||""; dept.value=settings.dept||"";
+  cardNumber.value=settings.cardNumber||""; writer.value=settings.writer||"";
+  f_date.value=todayStr();
+  renderHeader(); renderMonths(); render();
+}
+function saveEntries(){
+  entries.sort((a,b)=>a.date.localeCompare(b.date));
+  try{ localStorage.setItem(KEY_E, JSON.stringify(entries)); }
+  catch(e){ alert("저장 공간이 부족합니다. 백업 후 오래된 기록을 정리해주세요."); }
+}
+function saveSettings(){ localStorage.setItem(KEY_S, JSON.stringify(settings)); }
+
+function renderHeader(){
+  titleLine.textContent = settings.siteName ? settings.siteName+" 경비대장" : "현장 경비 지출대장";
+  subLine.textContent = (settings.writer? "작성자 "+settings.writer+" · ":"") + "총 "+entries.length+"건 저장됨";
+}
+function allMonths(){const s=new Set(entries.map(e=>monthOf(e.date)));s.add(monthOf(todayStr()));return [...s].sort().reverse();}
+function renderMonths(){
+  const prev=monthSelect.value, ms=allMonths();
+  monthSelect.innerHTML = ms.map(m=>{const[y,mo]=m.split("-");return `<option value="${m}">${y}년 ${Number(mo)}월</option>`;}).join("");
+  monthSelect.value = ms.includes(prev)?prev:monthOf(todayStr());
+}
+function curList(){const m=monthSelect.value;return entries.filter(e=>monthOf(e.date)===m).sort((a,b)=>a.date.localeCompare(b.date));}
+
+function render(){
+  const list=curList();
+  entryCount.textContent=list.length+"건";
+  ledger.innerHTML = list.length===0
+    ? `<div class="empty">이 달 기록이 아직 없어요.<br>위에서 입력해보세요.</div>`
+    : list.map(e=>`<div class="entry" data-id="${e.id}">
+        <div class="date">${e.date.slice(5).replace("-",".")}</div>
+        <div class="mid">
+          <div class="cat">${esc(e.cat)}</div>
+          <div class="vendor">${esc(e.vendor)}</div>
+          ${e.note?`<div class="note">${esc(e.note)}</div>`:""}
+          <span class="tag ${e.pay==="법인카드"?"corp":"cash"}">${esc(e.pay)}</span>
+        </div>
+        <div class="right">
+          <div class="amt">${fmtWon(e.amount)}원</div>
+          <button class="del" data-act="del" data-id="${e.id}">삭제</button>
+        </div></div>`).join("");
+  const corp=list.filter(e=>e.pay==="법인카드").reduce((s,e)=>s+ +e.amount,0);
+  const cash=list.filter(e=>e.pay!=="법인카드").reduce((s,e)=>s+ +e.amount,0);
+  totals.innerHTML=`
+    <div class="line"><span>소계 (법인카드)</span><span class="val">${fmtWon(corp)}원</span></div>
+    <div class="line"><span>소계 (현금/개인카드)</span><span class="val">${fmtWon(cash)}원</span></div>
+    <div class="line grand"><span>합계</span><span class="val">${fmtWon(corp+cash)}원</span></div>`;
+  renderHeader();
+  ledger.querySelectorAll('[data-act="del"]').forEach(b=>b.onclick=(ev)=>{
+    ev.stopPropagation();
+    if(!confirm("이 기록을 삭제할까요?"))return;
+    entries=entries.filter(x=>x.id!==b.dataset.id); saveEntries(); renderMonths(); render();
+  });
+  ledger.querySelectorAll(".entry").forEach(r=>r.onclick=(ev)=>{
+    if(ev.target.dataset.act==="del")return; startEdit(r.dataset.id);
+  });
+}
+function startEdit(id){
+  const e=entries.find(x=>x.id===id); if(!e)return;
+  editingId=id; f_date.value=e.date; f_cat.value=e.cat; f_vendor.value=e.vendor;
+  f_amount.value=e.amount; f_note.value=e.note||""; setPay(e.pay);
+  formTitle.textContent="기록 수정"; addBtn.textContent="수정 완료"; cancelEditBtn.style.display="block";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function stopEdit(){
+  editingId=null; formTitle.textContent="경비 입력"; addBtn.textContent="추가";
+  cancelEditBtn.style.display="none";
+  f_vendor.value=""; f_amount.value=""; f_note.value=""; f_date.value=todayStr(); setPay("법인카드");
+}
+function setPay(v){selectedPay=v;document.querySelectorAll(".pay-opt").forEach(el=>el.classList.toggle("active",el.dataset.v===v));}
+
+payGroup.onclick=(ev)=>{const o=ev.target.closest(".pay-opt"); if(o)setPay(o.dataset.v);};
+settingsBtn.onclick=()=>{settingsPanel.classList.toggle("open");backupPanel.classList.remove("open");};
+backupBtn.onclick=()=>{backupPanel.classList.toggle("open");settingsPanel.classList.remove("open");};
+saveSettingsBtn.onclick=()=>{
+  settings={siteName:siteName.value.trim(),dept:dept.value.trim(),cardNumber:cardNumber.value.trim(),writer:writer.value.trim()};
+  saveSettings(); renderHeader(); settingsPanel.classList.remove("open");
+};
+addBtn.onclick=()=>{
+  const date=f_date.value, cat=f_cat.value, vendor=f_vendor.value.trim();
+  const amount=Number(f_amount.value), note=f_note.value.trim();
+  if(!date){alert("날짜를 입력해주세요.");return;}
+  if(!amount||amount<=0){alert("금액을 입력해주세요.");return;}
+  if(editingId){
+    const i=entries.findIndex(e=>e.id===editingId);
+    if(i>-1) entries[i]={...entries[i],date,cat,vendor,amount,pay:selectedPay,note};
+  }else{
+    entries.push({id:uid(),date,cat,vendor,amount,pay:selectedPay,note});
+  }
+  saveEntries(); stopEdit(); renderMonths(); monthSelect.value=monthOf(date); render();
+};
+cancelEditBtn.onclick=stopEdit;
+monthSelect.onchange=render;
+
+exportJsonBtn.onclick=()=>{
+  const blob=new Blob([JSON.stringify({entries,settings},null,2)],{type:"application/json"});
+  dl(blob, `경비기록_백업_${todayStr()}.json`);
+};
+importJsonBtn.onclick=()=>importFile.click();
+importFile.onchange=(ev)=>{
+  const f=ev.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!Array.isArray(d.entries)) throw 0;
+      if(!confirm("백업 파일의 기록으로 되살릴까요? 지금 기록에 합쳐집니다.")) return;
+      const ids=new Set(entries.map(e=>e.id));
+      d.entries.forEach(e=>{ if(!ids.has(e.id)) entries.push(e); });
+      if(d.settings) { settings=d.settings; saveSettings(); }
+      saveEntries(); load();
+      alert("복원됐어요.");
+    }catch(e){ alert("이 파일은 백업 파일이 아닌 것 같아요."); }
+  };
+  r.readAsText(f);
+  ev.target.value="";
+};
+
+function defaultName(){
+  const [y,mo]=monthSelect.value.split("-");
+  return `TSC-01-001_${y}_${Number(mo)}월_경비_${settings.writer||"본인이름"}`;
+}
+function buildExcelHtml(){
+  const list=curList(), [y,mo]=monthSelect.value.split("-"), mn=Number(mo);
+  const ds=list.map(e=>e.date);
+  const s=ds.length?ds[0].slice(8):"00", en=ds.length?ds[ds.length-1].slice(8):"00";
+  const corp=list.filter(e=>e.pay==="법인카드").reduce((a,e)=>a+ +e.amount,0);
+  const cash=list.filter(e=>e.pay!=="법인카드").reduce((a,e)=>a+ +e.amount,0);
+  const MINROWS=32, rows=Math.max(list.length,MINROWS);
+  const B="border:1px solid #000;";
+  const CEN="text-align:center;vertical-align:middle;";
+  let body="";
+  for(let i=0;i<rows;i++){
+    const e=list[i];
+    body+=`<tr style="height:22px">
+      <td style="${B}${CEN}font-size:10pt">${e?e.date.slice(5).replace("-","/"):""}</td>
+      <td style="${B}${CEN}font-size:9pt">${e?esc(e.cat):""}</td>
+      <td style="${B}padding-left:6px;font-size:10pt">${e?esc(e.vendor):""}</td>
+      <td style="${B}text-align:right;padding-right:6px;mso-number-format:'\\#\\,\\#\\#0'">${e&&e.pay==="법인카드"?e.amount:""}</td>
+      <td style="${B}text-align:right;padding-right:6px;mso-number-format:'\\#\\,\\#\\#0'">${e&&e.pay!=="법인카드"?e.amount:""}</td>
+      <td style="${B}padding-left:6px;font-size:9pt">${e?esc(e.note):""}</td></tr>`;
+  }
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head><meta charset="UTF-8">
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>${mn}월 상세내역</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+</head><body>
+<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-family:맑은 고딕,Malgun Gothic;font-size:10pt">
+<col width="70"><col width="130"><col width="230"><col width="95"><col width="95"><col width="150">
+<tr style="height:20px"><td colspan="5"></td><td style="text-align:right;color:#C00000;font-size:9pt">TSC-01-001</td></tr>
+<tr style="height:34px"><td colspan="6" style="${CEN}font-size:16pt;font-weight:bold">( ${mn} )월 현장 경비 지출대장</td></tr>
+<tr style="height:22px"><td colspan="6" style="${CEN}font-size:11pt">[${y}. ${mo}. ${s} ~ ${mo}. ${en}]</td></tr>
+<tr style="height:14px"><td colspan="6"></td></tr>
+<tr style="height:24px">
+  <td style="font-weight:bold;font-size:10pt">현 장 명 :</td><td colspan="2" style="padding-left:6px">${esc(settings.siteName)}</td>
+  <td style="font-weight:bold;text-align:right;font-size:10pt">부 서 명 :</td><td colspan="2" style="padding-left:10px">${esc(settings.dept)}</td></tr>
+<tr style="height:24px">
+  <td style="font-weight:bold;font-size:10pt">카드번호 :</td><td colspan="2" style="padding-left:6px">${esc(settings.cardNumber)}</td>
+  <td style="font-weight:bold;text-align:right;font-size:10pt">작 성 자 :</td><td colspan="2" style="padding-left:10px">${esc(settings.writer)}</td></tr>
+<tr style="height:16px"><td colspan="6"></td></tr>
+<tr style="height:24px;background:#F2F2F2">
+  <td rowspan="2" style="${B}${CEN}font-weight:bold">날짜</td>
+  <td rowspan="2" style="${B}${CEN}font-weight:bold">계정과목</td>
+  <td rowspan="2" style="${B}${CEN}font-weight:bold">사용처</td>
+  <td colspan="2" style="${B}${CEN}font-weight:bold">금　액</td>
+  <td rowspan="2" style="${B}${CEN}font-weight:bold">비　고</td></tr>
+<tr style="height:22px;background:#F2F2F2">
+  <td style="${B}${CEN}font-weight:bold;font-size:9pt">법인카드</td>
+  <td style="${B}${CEN}font-weight:bold;font-size:9pt">현금/개인카드</td></tr>
+${body}
+<tr style="height:26px;background:#F2F2F2">
+  <td colspan="3" style="${B}${CEN}font-weight:bold">소　　　계</td>
+  <td style="${B}text-align:right;padding-right:6px;font-weight:bold;mso-number-format:'\\#\\,\\#\\#0'">${corp}</td>
+  <td style="${B}text-align:right;padding-right:6px;font-weight:bold;mso-number-format:'\\#\\,\\#\\#0'">${cash}</td>
+  <td style="${B}"></td></tr>
+<tr style="height:26px;background:#F2F2F2">
+  <td colspan="3" style="${B}${CEN}font-weight:bold">합　　　계</td>
+  <td colspan="2" style="${B}text-align:right;padding-right:6px;font-weight:bold;mso-number-format:'\\#\\,\\#\\#0'">${corp+cash}</td>
+  <td style="${B}"></td></tr>
+<tr style="height:30px"><td colspan="6"></td></tr>
+<tr style="height:18px"><td colspan="6" style="${CEN}font-size:9pt;font-weight:bold">${COMPANY.name}</td></tr>
+<tr style="height:16px"><td colspan="6" style="${CEN}font-size:8pt">${COMPANY.addr}</td></tr>
+<tr style="height:16px"><td colspan="6" style="${CEN}font-size:8pt">${COMPANY.tel}</td></tr>
+</table></body></html>`;
+}
+function dl(blob,name){
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=url; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1500);
+}
+function openModal(act){
+  pendingAction=act;
+  modalTitle.textContent = act==="share"?"공유할 파일 이름":"저장할 파일 이름";
+  fileNameInput.value=defaultName();
+  nameModalBg.classList.add("open");
+}
+modalCancel.onclick=()=>nameModalBg.classList.remove("open");
+modalOk.onclick=async()=>{
+  const name=(fileNameInput.value.trim()||defaultName())+".xls";
+  nameModalBg.classList.remove("open");
+  const html=buildExcelHtml();
+  const blob=new Blob(["\ufeff"+html],{type:"application/vnd.ms-excel;charset=utf-8"});
+  if(pendingAction==="share"){
+    const file=new File([blob],name,{type:"application/vnd.ms-excel"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file],title:name}); return; }catch(e){ return; }
+    }
+    alert("이 기기는 바로 공유가 안 돼요. 파일을 저장한 뒤 카카오톡에서 '파일'로 보내주세요.");
+  }
+  dl(blob,name);
+};
+exportBtn.onclick=()=>{ if(curList().length===0){alert("이 달에 입력된 기록이 없어요.");return;} openModal("download"); };
+shareBtn.onclick=()=>{ if(curList().length===0){alert("이 달에 입력된 기록이 없어요.");return;} openModal("share"); };
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+load();
+</script>
+</body>
+</html>
