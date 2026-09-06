@@ -196,8 +196,31 @@ function monthOf(s){return s?s.slice(0,7):"";}
 function uid(){return "e"+Date.now()+Math.random().toString(36).slice(2,7);}
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 
+// 예전 계정과목 이름 -> 새 계정과목 이름 (앱을 열 때 한 번 자동 변환)
+const CAT_MIGRATE = [
+  [/협력업체|외부인|접대/, "접대비"],
+  [/문구|소모품/, "소모품비"],
+  [/숙박|교통비|출장/, "여비교통비"],
+  [/주유|통행료|차량/, "차량유지비"],
+  [/조식|중식|석식|식사|음료/, "복리후생비"]
+];
+function migrateCats(){
+  let changed = false;
+  entries.forEach(e=>{
+    if(!e.cat || CATS.includes(e.cat)) return;
+    for(const [re, nw] of CAT_MIGRATE){
+      if(re.test(e.cat)){
+        if(e.cat !== nw){ e.cat = nw; changed = true; }
+        return;
+      }
+    }
+  });
+  if(changed) saveEntries();
+}
+
 function load(){
   try{ entries = JSON.parse(localStorage.getItem(KEY_E)||"[]"); }catch(e){ entries=[]; }
+  migrateCats();
   try{ const s=localStorage.getItem(KEY_S); if(s) settings=JSON.parse(s); }catch(e){}
   siteName.value=settings.siteName||""; dept.value=settings.dept||"";
   cardNumber.value=settings.cardNumber||""; writer.value=settings.writer||"";
