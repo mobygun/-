@@ -319,6 +319,9 @@ addBtn.onclick=()=>{
   const amount=Number(f_amount.value), note=f_note.value.trim();
   if(!date){alert("날짜를 입력해주세요.");return;}
   if(!amount||amount<=0){alert("금액을 입력해주세요.");return;}
+  // 연도 오타(예: 2062년) 방지 - 오늘로부터 1년 넘게 떨어지면 한 번 확인
+  const diffDays = Math.abs(new Date(date) - new Date(todayStr())) / 86400000;
+  if(diffDays > 365 && !confirm(date+" 날짜가 맞나요?\n오늘과 1년 이상 차이가 납니다.")) return;
   if(!cat){alert("계정과목을 입력해주세요.");return;}
   if(editingId){
     const i=entries.findIndex(e=>e.id===editingId);
