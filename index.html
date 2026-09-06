@@ -102,7 +102,7 @@
     <h2>현장 정보 (엑셀 상단에 자동으로 들어갑니다)</h2>
     <div class="row2">
       <div class="field"><label>현장명</label><input type="text" id="siteName" placeholder="예: 본사"></div>
-      <div class="field"><label>부서명</label><input type="text" id="dept" placeholder="예: 공무팀"></div>
+      <div class="field"><label>부서명</label><input type="text" id="dept" placeholder="예: 인프라공사부"></div>
     </div>
     <div class="row2">
       <div class="field"><label>카드번호</label><input type="text" id="cardNumber" placeholder="예: 1234"></div>
@@ -124,13 +124,17 @@
     <div class="field"><label>날짜</label><input type="date" id="f_date"></div>
     <div class="field"><label>계정과목</label>
       <select id="f_cat">
-        <option value="식사(조식, 중식, 석식)">식사(조식, 중식, 석식)</option>
-        <option value="음료">음료</option>
-        <option value="협력업체, 업무관련 외부인 식사">협력업체, 업무관련 외부인 식사</option>
-        <option value="문구 구매">문구 구매</option>
-        <option value="출장 숙박비, 교통비">출장 숙박비, 교통비</option>
-        <option value="주유비, 고속도로 통행료">주유비, 고속도로 통행료</option>
+        <option value="복리후생비">복리후생비 (식사, 음료 등)</option>
+        <option value="접대비">접대비 (협력업체, 업무관련 외부인 식사)</option>
+        <option value="소모품비">소모품비 (문구 구매)</option>
+        <option value="여비교통비">여비교통비 (출장 숙박비, 교통비)</option>
+        <option value="차량유지비">차량유지비 (주유비, 고속도로 통행료)</option>
+        <option value="__etc__">기타 (직접 입력)</option>
       </select>
+    </div>
+    <div class="field" id="etcField" style="display:none;">
+      <label>기타 계정과목 직접 입력</label>
+      <input type="text" id="f_catEtc" placeholder="예: 지급수수료">
     </div>
     <div class="row2">
       <div class="field"><label>사용처</label><input type="text" id="f_vendor" placeholder="예: OO식당"></div>
@@ -254,7 +258,7 @@ function render(){
 }
 function startEdit(id){
   const e=entries.find(x=>x.id===id); if(!e)return;
-  editingId=id; f_date.value=e.date; f_cat.value=e.cat; f_vendor.value=e.vendor;
+  editingId=id; f_date.value=e.date; writeCat(e.cat); f_vendor.value=e.vendor;
   f_amount.value=e.amount; f_note.value=e.note||""; setPay(e.pay);
   formTitle.textContent="기록 수정"; addBtn.textContent="수정 완료"; cancelEditBtn.style.display="block";
   window.scrollTo({top:0,behavior:"smooth"});
@@ -263,10 +267,23 @@ function stopEdit(){
   editingId=null; formTitle.textContent="경비 입력"; addBtn.textContent="추가";
   cancelEditBtn.style.display="none";
   f_vendor.value=""; f_amount.value=""; f_note.value=""; f_date.value=todayStr(); setPay("법인카드");
+  f_cat.value="복리후생비"; f_catEtc.value=""; syncEtc();
 }
 function setPay(v){selectedPay=v;document.querySelectorAll(".pay-opt").forEach(el=>el.classList.toggle("active",el.dataset.v===v));}
 
 payGroup.onclick=(ev)=>{const o=ev.target.closest(".pay-opt"); if(o)setPay(o.dataset.v);};
+const CATS=["복리후생비","접대비","소모품비","여비교통비","차량유지비"];
+function syncEtc(){ etcField.style.display = (f_cat.value==="__etc__") ? "block" : "none"; }
+f_cat.onchange=syncEtc;
+function readCat(){
+  if(f_cat.value==="__etc__") return f_catEtc.value.trim();
+  return f_cat.value;
+}
+function writeCat(v){
+  if(CATS.includes(v)){ f_cat.value=v; f_catEtc.value=""; }
+  else { f_cat.value="__etc__"; f_catEtc.value=v||""; }
+  syncEtc();
+}
 backupBtn.onclick=()=>{backupPanel.classList.toggle("open");};
 saveSettingsBtn.onclick=()=>{
   settings={siteName:siteName.value.trim(),dept:dept.value.trim(),cardNumber:cardNumber.value.trim(),writer:writer.value.trim()};
@@ -275,10 +292,11 @@ saveSettingsBtn.onclick=()=>{
   setTimeout(()=>{saveSettingsBtn.textContent="저장";},1500);
 };
 addBtn.onclick=()=>{
-  const date=f_date.value, cat=f_cat.value, vendor=f_vendor.value.trim();
+  const date=f_date.value, cat=readCat(), vendor=f_vendor.value.trim();
   const amount=Number(f_amount.value), note=f_note.value.trim();
   if(!date){alert("날짜를 입력해주세요.");return;}
   if(!amount||amount<=0){alert("금액을 입력해주세요.");return;}
+  if(!cat){alert("계정과목을 입력해주세요.");return;}
   if(editingId){
     const i=entries.findIndex(e=>e.id===editingId);
     if(i>-1) entries[i]={...entries[i],date,cat,vendor,amount,pay:selectedPay,note};
