@@ -155,7 +155,12 @@
     let drawing = textOf("xl/drawings/drawing1.xml");
     if(delta) drawing = drawing.replace(/<xdr:row>(\d+)<\/xdr:row>/g,
       (x,n)=> "<xdr:row>"+(+n>=42 ? +n+delta : +n)+"</xdr:row>");
-    let wbx = textOf("xl/workbook.xml").replace("2026_00월 상세내역_현장명", year+"_"+monthNum+"월 상세내역");
+    let wbx = textOf("xl/workbook.xml").replace(/2026_00월 상세내역_현장명/g, year+"_"+monthNum+"월 상세내역");
+    // 인쇄 영역(파란 실선)을 A1:F47 기준으로 유지하되, 줄이 늘어난 만큼만 아래로 확장
+    wbx = wbx.replace(/(_xlnm\.Print_Area" localSheetId="2">[^<]*\$A\$1:\$F\$)(\d+)/,
+      (m,head,n)=> head + (47+delta));
+    wbx = wbx.replace(/(_xlnm\._FilterDatabase" localSheetId="2"[^>]*>[^<]*\$A\$11:\$F\$)(\d+)/,
+      (m,head,n)=> head + (45+delta));
     let rels = textOf("xl/_rels/workbook.xml.rels").replace(/<Relationship[^>]*calcChain\.xml"\/>/, "");
     let ct = textOf("[Content_Types].xml").replace(/<Override PartName="\/xl\/calcChain\.xml"[^>]*\/>/, "");
 

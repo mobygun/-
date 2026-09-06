@@ -33,8 +33,13 @@
   .card h2{font-size:13px;margin:0 0 10px;color:var(--muted);font-weight:600;}
   .field{margin-bottom:10px;}
   .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;}
-  .field input,.field select{width:100%;padding:11px 10px;border:1px solid var(--line);border-radius:8px;
-    font-size:16px;background:#FBFAF6;color:var(--ink);font-family:inherit;}
+  .field input,.field select{width:100%;max-width:100%;min-width:0;display:block;
+    padding:11px 10px;border:1px solid var(--line);border-radius:8px;
+    font-size:16px;background:#FBFAF6;color:var(--ink);font-family:inherit;
+    -webkit-appearance:none;appearance:none;}
+  .field input[type=date]{height:46px;line-height:normal;}
+  .field input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0;}
+  .field input[type=date]::-webkit-calendar-picker-indicator{margin-left:auto;}
   .row2{display:flex;gap:8px;}
   .row2>.field{flex:1;min-width:0;}
   .pay-group{display:flex;gap:6px;}
@@ -158,7 +163,7 @@
     <div class="totals" id="totals"></div>
   </div>
 
-  <div class="hint">기록은 이 폰 안에 저장돼요. 인터넷이 없어도 열리고, 앱을 껐다 켜도 남아 있습니다.</div>
+  <div class="hint">기록은 이 폰 안에 저장돼요. 인터넷이 없어도 열리고, 앱을 껐다 켜도 남아 있습니다.<br>컴퓨터로 옮길 땐 <b>공유하기</b> → 카카오톡 <b>나와의 채팅</b>으로 보내면 가장 빠릅니다.</div>
 </div>
 
 <div class="actionbar">
@@ -339,11 +344,17 @@ modalOk.onclick=async()=>{
     return;
   }
   if(pendingAction==="share"){
-    const file=new File([blob],name,{type:blob.type});
+    const file=new File([blob],name,{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    // 제목·텍스트를 같이 보내면 카카오톡이 파일 대신 글자만 보냅니다. 파일만 넘깁니다.
     if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{ await navigator.share({files:[file],title:name}); return; }catch(e){ return; }
+      try{
+        await navigator.share({files:[file]});
+        return;
+      }catch(e){
+        if(e && e.name==="AbortError") return;
+      }
     }
-    alert("이 기기는 바로 공유가 안 돼요. 파일을 저장한 뒤 카카오톡에서 '파일'로 보내주세요.");
+    alert("이 기기에서는 바로 공유가 안 돼요.\n파일을 저장할 테니, 원하는 앱에서 '파일 첨부'로 보내주세요.");
   }
   dl(blob,name);
 };
