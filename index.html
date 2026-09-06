@@ -46,8 +46,8 @@
   .pay-opt{flex:1;text-align:center;padding:11px 4px;border:1px solid var(--line);border-radius:8px;
     font-size:13.5px;color:var(--muted);background:#FBFAF6;}
   .pay-opt.active{background:var(--ink);color:#F4F1E8;border-color:var(--ink);}
-  #settingsPanel,#backupPanel{display:none;}
-  #settingsPanel.open,#backupPanel.open{display:block;}
+  #backupPanel{display:none;}
+  #backupPanel.open{display:block;}
   .btn{width:100%;border:none;border-radius:9px;padding:13px;font-size:15px;font-weight:700;font-family:inherit;}
   .btn-primary{background:var(--accent);color:#fff;}
   .btn-ghost{background:none;border:1px solid var(--line);color:var(--ink);font-weight:600;}
@@ -92,10 +92,7 @@
       <h1 id="titleLine">현장 경비 지출대장</h1>
       <div class="sub" id="subLine">불러오는 중…</div>
     </div>
-    <div style="display:flex;gap:6px;">
-      <button id="backupBtn" type="button">백업</button>
-      <button id="settingsBtn" type="button">현장정보</button>
-    </div>
+    <button id="backupBtn" type="button">백업</button>
   </div>
 </header>
 
@@ -270,11 +267,12 @@ function stopEdit(){
 function setPay(v){selectedPay=v;document.querySelectorAll(".pay-opt").forEach(el=>el.classList.toggle("active",el.dataset.v===v));}
 
 payGroup.onclick=(ev)=>{const o=ev.target.closest(".pay-opt"); if(o)setPay(o.dataset.v);};
-settingsBtn.onclick=()=>{settingsPanel.classList.toggle("open");backupPanel.classList.remove("open");};
-backupBtn.onclick=()=>{backupPanel.classList.toggle("open");settingsPanel.classList.remove("open");};
+backupBtn.onclick=()=>{backupPanel.classList.toggle("open");};
 saveSettingsBtn.onclick=()=>{
   settings={siteName:siteName.value.trim(),dept:dept.value.trim(),cardNumber:cardNumber.value.trim(),writer:writer.value.trim()};
-  saveSettings(); renderHeader(); settingsPanel.classList.remove("open");
+  saveSettings(); renderHeader();
+  saveSettingsBtn.textContent="저장됨";
+  setTimeout(()=>{saveSettingsBtn.textContent="저장";},1500);
 };
 addBtn.onclick=()=>{
   const date=f_date.value, cat=f_cat.value, vendor=f_vendor.value.trim();
