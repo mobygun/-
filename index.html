@@ -96,6 +96,11 @@
   .odo{background:#F4F1E8;border:1px solid var(--line);border-radius:9px;padding:10px 12px;
     font-size:13px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .odo b{font-variant-numeric:tabular-nums;font-size:15px;}
+  .warn{background:#FCEFEC;border:1px solid #E2A79B;border-radius:9px;padding:10px 12px;
+    font-size:12.5px;color:var(--danger);line-height:1.5;margin-bottom:10px;}
+  .warn b{font-weight:700;}
+  .entry.adj .cat{color:var(--danger);}
+  .entry.adj .tag{background:var(--danger);}
   .odo button{background:none;border:1px solid var(--line);border-radius:7px;padding:5px 9px;
     font-size:12px;color:var(--muted);font-family:inherit;}
 </style>
@@ -229,13 +234,24 @@
       <div class="field"><label>주행거리 (km)</label><input type="number" id="d_dist" placeholder="예: 52" inputmode="numeric"></div>
       <div class="field"><label>구분</label>
         <select id="d_purpose">
-          <option value="업무용">업무용</option>
           <option value="출퇴근용">출퇴근용</option>
+          <option value="업무용">업무용</option>
         </select>
       </div>
     </div>
 
     <div class="field"><label>비고 (어디를 다녀왔는지)</label><input type="text" id="d_note" placeholder="예: 본사-평택현장-본사"></div>
+
+    <div class="field"><label>비용 (쓴 게 있을 때만, 원)</label>
+      <div class="row2">
+        <div class="field" style="margin-bottom:6px;"><input type="number" id="d_fuel" placeholder="주유비" inputmode="numeric"></div>
+        <div class="field" style="margin-bottom:6px;"><input type="number" id="d_toll" placeholder="통행료" inputmode="numeric"></div>
+      </div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:0;"><input type="number" id="d_park" placeholder="주차비" inputmode="numeric"></div>
+        <div class="field" style="margin-bottom:0;"><input type="number" id="d_etc" placeholder="기타" inputmode="numeric"></div>
+      </div>
+    </div>
 
     <div class="editbar">
       <button class="btn btn-primary" id="dAddBtn" type="button">추가</button>
@@ -578,9 +594,21 @@ function dRender(){
   odoNow.textContent = fmtWon(dCurrentOdo());
   const list=dCurList();
   dEntryCount.textContent=list.length+"건";
-  dLedger.innerHTML = list.length===0
+  // 이 달의 계기판 보정 내역을 빨간 배너로 표시
+  const m=dMonthSelect.value;
+  const fixes=dChain().list.filter(e=>e.kind==="fix" && monthOf(e.date)===m);
+  const adjs=list.filter(e=>e.adj);
+  let warn="";
+  if(fixes.length||adjs.length){
+    warn='<div class="warn"><b>계기판 보정 기록</b><br>'+
+      adjs.map(e=>"· "+e.date.slice(5)+" 누락분 "+fmtWon(e.dist)+"km 를 운행으로 추가함").join("<br>")+
+      (adjs.length&&fixes.length?"<br>":"")+
+      fixes.map(e=>"· "+e.date.slice(5)+" 계기판을 "+fmtWon(e.odo)+"km 로 맞춤 ("+(e.diff>0?"+":"")+fmtWon(e.diff)+"km, 장부가 끊깁니다)").join("<br>")+
+      '</div>';
+  }
+  dLedger.innerHTML = warn + (list.length===0
     ? '<div class="empty">이 달 운행 기록이 없어요.</div>'
-    : list.map(e=>'<div class="entry" data-id="'+e.id+'">'+
+    : list.map(e=>'<div class="entry'+(e.adj?" adj":"")+'" data-id="'+e.id+'">'+
         '<div class="date">'+e.date.slice(5).replace("-",".")+'</div>'+
         '<div class="mid">'+
           '<div class="cat">'+e.dist+' km</div>'+
@@ -589,7 +617,7 @@ function dRender(){
           '<span class="tag '+(e.purpose==="업무용"?"corp":"cash")+'">'+esc(e.purpose)+'</span>'+
         '</div>'+
         '<div class="right"><button class="del" data-act="ddel" data-id="'+e.id+'">삭제</button></div>'+
-      '</div>').join("");
+      '</div>').join(""));
   const work=list.filter(e=>e.purpose==="업무용").reduce((s,e)=>s+ +e.dist,0);
   const comm=list.filter(e=>e.purpose!=="업무용").reduce((s,e)=>s+ +e.dist,0);
   const tot=work+comm;
@@ -612,12 +640,32 @@ dSaveSettings.onclick=()=>{
   dSaveSettings.textContent="저장됨"; setTimeout(()=>{dSaveSettings.textContent="저장";},1500);
 };
 odoFixBtn.onclick=()=>{
-  const v=prompt("지금 계기판에 표시된 숫자를 입력하세요 (km)", dCurrentOdo());
+  const cur=dCurrentOdo();
+  const v=prompt("지금 계기판에 표시된 숫자를 입력하세요 (km)\n앱이 아는 값: "+fmtWon(cur), cur);
   if(v===null) return;
   const n=Number(v);
   if(!n||n<0){alert("숫자로 입력해주세요.");return;}
-  dEntries.push({id:uid(),kind:"fix",date:todayStr(),seq:Date.now(),odo:n});
-  dSave(); dRender();
+  const diff=n-cur;
+  if(diff===0){ alert("계기판과 앱의 숫자가 이미 같습니다."); return; }
+
+  if(diff>0){
+    const yes=confirm("실제 계기판이 "+fmtWon(diff)+"km 더 많습니다.\n\n"+
+      "[확인] 기록을 빠뜨린 운행이 있다 → 운행 한 줄로 추가\n"+
+      "[취소] 그냥 계기판 오차다 → 숫자만 맞춤");
+    if(yes){
+      const dt=prompt("그 운행을 언제로 넣을까요? (YYYY-MM-DD)", todayStr());
+      if(dt===null) return;
+      const date=/^\d{4}-\d{2}-\d{2}$/.test(dt)? dt : todayStr();
+      const isWork=confirm("그 운행의 용도는?\n\n[확인] 업무용\n[취소] 출퇴근용");
+      dEntries.push({id:uid(),kind:"trip",date,seq:Date.now(),dist:diff,
+        note:"기록 누락분 보충", purpose:isWork?"업무용":"출퇴근용", adj:true,
+        fuel:0,toll:0,park:0,etc:0});
+      dSave(); dRenderMonths(); dMonthSelect.value=monthOf(date); dRender();
+      return;
+    }
+  }
+  dEntries.push({id:uid(),kind:"fix",date:todayStr(),seq:Date.now(),odo:n,diff});
+  dSave(); dRenderMonths(); dRender();
 };
 dAddBtn.onclick=()=>{
   const date=d_date.value, dist=Number(d_dist.value), note=d_note.value.trim(), purpose=d_purpose.value;
@@ -625,11 +673,13 @@ dAddBtn.onclick=()=>{
   if(!dist||dist<=0){alert("주행거리를 입력해주세요.");return;}
   const diffDays=Math.abs(new Date(date)-new Date(todayStr()))/86400000;
   if(diffDays>365 && !confirm(date+" 날짜가 맞나요?\n오늘과 1년 이상 차이가 납니다.")) return;
+  const cost={fuel:Number(d_fuel.value)||0, toll:Number(d_toll.value)||0,
+              park:Number(d_park.value)||0, etc:Number(d_etc.value)||0};
   if(dEditingId){
     const i=dEntries.findIndex(e=>e.id===dEditingId);
-    if(i>-1) dEntries[i]={...dEntries[i],date,dist,note,purpose};
+    if(i>-1) dEntries[i]={...dEntries[i],date,dist,note,purpose,...cost};
   }else{
-    dEntries.push({id:uid(),kind:"trip",date,seq:Date.now(),dist,note,purpose});
+    dEntries.push({id:uid(),kind:"trip",date,seq:Date.now(),dist,note,purpose,...cost});
   }
   dSave(); dStopEdit(); dRenderMonths(); dMonthSelect.value=monthOf(date); dRender();
 };
@@ -637,6 +687,8 @@ function dStopEdit(){
   dEditingId=null; dFormTitle.textContent="운행 입력"; dAddBtn.textContent="추가";
   dCancelBtn.style.display="none";
   d_dist.value=""; d_note.value=""; d_date.value=todayStr();
+  d_fuel.value=""; d_toll.value=""; d_park.value=""; d_etc.value="";
+  d_purpose.value="출퇴근용";
 }
 dCancelBtn.onclick=dStopEdit;
 dMonthSelect.onchange=dRender;
@@ -644,16 +696,27 @@ dMonthSelect.onchange=dRender;
 // 하루 단위로 묶어서 엑셀용 데이터 생성
 function dDaysForExport(){
   const m=dMonthSelect.value, days={};
-  dChain().list.filter(e=>e.kind!=="fix" && monthOf(e.date)===m).forEach(e=>{
-    const d = days[e.date] || (days[e.date]={before:e.before, after:e.after, work:0, commute:0,
-      dept:dSettings.dept, name:dSettings.name, notes:[]});
-    d.before=Math.min(d.before,e.before); d.after=Math.max(d.after,e.after);
+  function slot(date){
+    return days[date] || (days[date]={before:null, after:null, work:0, commute:0,
+      fuel:0, toll:0, park:0, etc:0, dept:dSettings.dept, name:dSettings.name, notes:[]});
+  }
+  dChain().list.filter(e=>monthOf(e.date)===m).forEach(e=>{
+    const d=slot(e.date);
+    if(e.kind==="fix"){
+      d.notes.push("※ 계기판 보정 "+(e.diff>0?"+":"")+e.diff+"km (실제 "+e.odo+"km)");
+      return;
+    }
+    d.before = (d.before===null) ? e.before : Math.min(d.before, e.before);
+    d.after  = (d.after===null)  ? e.after  : Math.max(d.after,  e.after);
     if(e.purpose==="업무용") d.work += Number(e.dist)||0; else d.commute += Number(e.dist)||0;
+    d.fuel += Number(e.fuel)||0; d.toll += Number(e.toll)||0;
+    d.park += Number(e.park)||0; d.etc  += Number(e.etc)||0;
     if(e.note) d.notes.push(e.note);
   });
   Object.values(days).forEach(d=>{ d.note=d.notes.join(", "); delete d.notes; });
   return days;
 }
+
 
 
 /* ================= 화면 전환 ================= */

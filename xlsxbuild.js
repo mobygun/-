@@ -161,6 +161,8 @@
       (m,head,n)=> head + (47+delta));
     wbx = wbx.replace(/(_xlnm\._FilterDatabase" localSheetId="2"[^>]*>[^<]*\$A\$11:\$F\$)(\d+)/,
       (m,head,n)=> head + (45+delta));
+    // 엑셀이 열릴 때 모든 수식을 다시 계산하도록 (소계·합계가 0으로 보이는 문제 방지)
+    wbx = wbx.replace(/<calcPr([^>]*?)\/>/, '<calcPr$1 fullCalcOnLoad="1"/>');
     let rels = textOf("xl/_rels/workbook.xml.rels").replace(/<Relationship[^>]*calcChain\.xml"\/>/, "");
     let ct = textOf("[Content_Types].xml").replace(/<Override PartName="\/xl\/calcChain\.xml"[^>]*\/>/, "");
 

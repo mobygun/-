@@ -102,6 +102,10 @@
           r=setCell(r,"H"+rn,d.commute? d.commute : "", !!d.commute);
           r=setCell(r,"I"+rn,d.work? d.work : "", !!d.work);
           r=setCell(r,"J"+rn,d.note||"");
+          r=setCell(r,"K"+rn,d.fuel? d.fuel:"", !!d.fuel);      // 주유비
+          r=setCell(r,"L"+rn,d.toll? d.toll:"", !!d.toll);      // 통행료
+          r=setCell(r,"M"+rn,d.park? d.park:"", !!d.park);      // 주차비
+          r=setCell(r,"N"+rn,d.etc? d.etc:"", !!d.etc);         // 기타
         }
       }
       byNum[rn]=r;
@@ -113,6 +117,8 @@
 
     const tabName = y+"."+pad2(mo)+"월";
     let wbx = textOf("xl/workbook.xml").replace(/2026\.00월/g, tabName);
+    // 엑셀이 열릴 때 모든 수식을 다시 계산하도록 (소계·합계가 0으로 보이는 문제 방지)
+    wbx = wbx.replace(/<calcPr([^>]*?)\/>/, '<calcPr$1 fullCalcOnLoad="1"/>');
     let rels = textOf("xl/_rels/workbook.xml.rels").replace(/<Relationship[^>]*calcChain\.xml"\/>/, "");
     let ct = textOf("[Content_Types].xml").replace(/<Override PartName="\/xl\/calcChain\.xml"[^>]*\/>/, "");
 
