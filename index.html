@@ -40,6 +40,9 @@
     font-size:16px;background:#FBFAF6;color:var(--ink);font-family:inherit;
     -webkit-appearance:none;appearance:none;}
   .field input[type=date]{height:46px;line-height:normal;}
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  input[type=number]{-moz-appearance:textfield;}
   .field input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0;}
   .field input[type=date]::-webkit-calendar-picker-indicator{margin-left:auto;}
   .row2{display:flex;gap:8px;}
@@ -93,12 +96,21 @@
   .route{border:1px solid var(--line);background:#FBFAF6;border-radius:18px;padding:8px 12px;
     font-size:13px;color:var(--ink);font-family:inherit;}
   .route.add{border-style:dashed;color:var(--muted);}
+  .route-wrap{display:inline-flex;align-items:stretch;}
+  .route-wrap .route{border-radius:18px 0 0 18px;border-right:none;}
+  .route-x{border:1px solid var(--line);border-left:1px dashed var(--line);
+    border-radius:0 18px 18px 0;background:#FBFAF6;color:var(--muted);
+    font-size:14px;padding:0 11px;font-family:inherit;line-height:1;}
   .odo{background:#F4F1E8;border:1px solid var(--line);border-radius:9px;padding:10px 12px;
     font-size:13px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .odo b{font-variant-numeric:tabular-nums;font-size:15px;}
   .warn{background:#FCEFEC;border:1px solid #E2A79B;border-radius:9px;padding:10px 12px;
     font-size:12.5px;color:var(--danger);line-height:1.5;margin-bottom:10px;}
   .warn b{font-weight:700;}
+  .warnrow{display:flex;align-items:center;gap:6px;margin-top:4px;}
+  .warnrow span{flex:1;}
+  .warndel{margin-left:auto;flex-shrink:0;background:#fff;border:1px solid #E2A79B;
+    color:var(--danger);border-radius:6px;padding:3px 8px;font-size:11.5px;font-family:inherit;}
   .entry.adj .cat{color:var(--danger);}
   .entry.adj .tag{background:var(--danger);}
   .odo button{background:none;border:1px solid var(--line);border-radius:7px;padding:5px 9px;
@@ -171,7 +183,7 @@
     </div>
     <div class="row2">
       <div class="field"><label>사용처</label><input type="text" id="f_vendor" placeholder="예: OO식당"></div>
-      <div class="field"><label>금액(원)</label><input type="number" id="f_amount" placeholder="15000" inputmode="numeric"></div>
+      <div class="field"><label>금액(원)</label><input type="text" class="num" id="f_amount" placeholder="15000" inputmode="numeric"></div>
     </div>
     <div class="field">
       <label>결제수단</label>
@@ -231,7 +243,7 @@
     </div>
 
     <div class="row2">
-      <div class="field"><label>주행거리 (km)</label><input type="number" id="d_dist" placeholder="예: 52" inputmode="numeric"></div>
+      <div class="field"><label>주행거리 (km)</label><input type="text" class="num" id="d_dist" placeholder="예: 52" inputmode="numeric"></div>
       <div class="field"><label>구분</label>
         <select id="d_purpose">
           <option value="출퇴근용">출퇴근용</option>
@@ -244,12 +256,12 @@
 
     <div class="field"><label>비용 (쓴 게 있을 때만, 원)</label>
       <div class="row2">
-        <div class="field" style="margin-bottom:6px;"><input type="number" id="d_fuel" placeholder="주유비" inputmode="numeric"></div>
-        <div class="field" style="margin-bottom:6px;"><input type="number" id="d_toll" placeholder="통행료" inputmode="numeric"></div>
+        <div class="field" style="margin-bottom:6px;"><input type="text" class="num" id="d_fuel" placeholder="주유비" inputmode="numeric"></div>
+        <div class="field" style="margin-bottom:6px;"><input type="text" class="num" id="d_toll" placeholder="통행료" inputmode="numeric"></div>
       </div>
       <div class="row2">
-        <div class="field" style="margin-bottom:0;"><input type="number" id="d_park" placeholder="주차비" inputmode="numeric"></div>
-        <div class="field" style="margin-bottom:0;"><input type="number" id="d_etc" placeholder="기타" inputmode="numeric"></div>
+        <div class="field" style="margin-bottom:0;"><input type="text" class="num" id="d_park" placeholder="주차비" inputmode="numeric"></div>
+        <div class="field" style="margin-bottom:0;"><input type="text" class="num" id="d_etc" placeholder="기타" inputmode="numeric"></div>
       </div>
     </div>
 
@@ -569,27 +581,35 @@ function dCurList(){
 }
 function dRenderRoutes(){
   routeList.innerHTML = dRoutes.map((r,i)=>
-    '<button class="route" data-i="'+i+'" type="button">'+esc(r.name)+' · '+r.dist+'km</button>').join("")
+      '<span class="route-wrap">'+
+        '<button class="route" data-i="'+i+'" type="button">'+esc(r.name)+' · '+r.dist+'km</button>'+
+        '<button class="route-x" data-del="'+i+'" type="button" aria-label="삭제">×</button>'+
+      '</span>').join("")
     + '<button class="route add" id="routeAdd" type="button">+ 경로 등록</button>';
+
   routeList.querySelectorAll(".route[data-i]").forEach(b=>{
     b.onclick=()=>{
       const r=dRoutes[+b.dataset.i];
-      d_dist.value=r.dist; d_note.value=r.name; d_purpose.value=r.purpose||"업무용";
+      d_dist.value=r.dist; d_note.value=r.name; d_purpose.value=r.purpose||"출퇴근용";
     };
-    b.oncontextmenu=(ev)=>{
-      ev.preventDefault();
-      if(confirm('"'+dRoutes[+b.dataset.i].name+'" 경로를 삭제할까요?')){
-        dRoutes.splice(+b.dataset.i,1); dSaveRoutes(); dRenderRoutes();
+  });
+  routeList.querySelectorAll("[data-del]").forEach(b=>{
+    b.onclick=()=>{
+      const i=+b.dataset.del;
+      if(confirm('"'+dRoutes[i].name+'" 경로를 목록에서 지울까요?\n(이미 입력해둔 운행 기록은 그대로 남습니다)')){
+        dRoutes.splice(i,1); dSaveRoutes(); dRenderRoutes();
       }
     };
   });
-  const addBtn=document.getElementById("routeAdd");
-  addBtn.onclick=()=>{
+  document.getElementById("routeAdd").onclick=()=>{
     const name=prompt("경로 이름 (예: 본사-평택현장-본사)"); if(!name)return;
     const dist=Number(prompt("왕복 거리 (km)")); if(!dist||dist<=0){alert("거리를 숫자로 입력해주세요.");return;}
-    dRoutes.push({name:name.trim(),dist,purpose:"업무용"}); dSaveRoutes(); dRenderRoutes();
+    const isWork=confirm("이 경로의 기본 용도는?\n\n[확인] 업무용\n[취소] 출퇴근용");
+    dRoutes.push({name:name.trim(),dist,purpose:isWork?"업무용":"출퇴근용"});
+    dSaveRoutes(); dRenderRoutes();
   };
 }
+
 function dRender(){
   odoNow.textContent = fmtWon(dCurrentOdo());
   const list=dCurList();
@@ -600,10 +620,11 @@ function dRender(){
   const adjs=list.filter(e=>e.adj);
   let warn="";
   if(fixes.length||adjs.length){
-    warn='<div class="warn"><b>계기판 보정 기록</b><br>'+
-      adjs.map(e=>"· "+e.date.slice(5)+" 누락분 "+fmtWon(e.dist)+"km 를 운행으로 추가함").join("<br>")+
-      (adjs.length&&fixes.length?"<br>":"")+
-      fixes.map(e=>"· "+e.date.slice(5)+" 계기판을 "+fmtWon(e.odo)+"km 로 맞춤 ("+(e.diff>0?"+":"")+fmtWon(e.diff)+"km, 장부가 끊깁니다)").join("<br>")+
+    warn='<div class="warn"><b>계기판 보정 기록</b>'+
+      adjs.map(e=>'<div class="warnrow">· '+e.date.slice(5)+" 누락분 "+fmtWon(e.dist)+'km 를 운행으로 추가함</div>').join("")+
+      fixes.map(e=>'<div class="warnrow">· '+e.date.slice(5)+" 계기판을 "+fmtWon(e.odo)+"km 로 맞춤 ("+
+        ((e.diff||0)>0?"+":"")+fmtWon(e.diff||0)+"km, 장부가 끊깁니다)"+
+        '<button class="warndel" data-fix="'+e.id+'" type="button">취소</button></div>').join("")+
       '</div>';
   }
   dLedger.innerHTML = warn + (list.length===0
@@ -626,6 +647,10 @@ function dRender(){
     '<div class="line"><span>출퇴근용</span><span class="val">'+fmtWon(comm)+' km</span></div>'+
     '<div class="line grand"><span>총 주행거리</span><span class="val">'+fmtWon(tot)+' km</span></div>'+
     '<div class="line"><span>업무사용비율</span><span class="val">'+(tot? Math.round(work/tot*100):0)+'%</span></div>';
+  dLedger.querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>{
+    if(!confirm("이 계기판 보정을 취소할까요?\n계기판 숫자가 보정 전 값으로 되돌아갑니다."))return;
+    dEntries=dEntries.filter(x=>x.id!==b.dataset.fix); dSave(); dRenderMonths(); dRender();
+  });
   dLedger.querySelectorAll('[data-act="ddel"]').forEach(b=>b.onclick=(ev)=>{
     ev.stopPropagation();
     if(!confirm("이 기록을 삭제할까요?"))return;
@@ -641,7 +666,7 @@ dSaveSettings.onclick=()=>{
 };
 odoFixBtn.onclick=()=>{
   const cur=dCurrentOdo();
-  const v=prompt("지금 계기판에 표시된 숫자를 입력하세요 (km)\n앱이 아는 값: "+fmtWon(cur), cur);
+  const v=prompt("지금 계기판에 표시된 숫자를 입력하세요 (km)\n앱이 아는 값: "+fmtWon(cur)+"\n기록될 날짜: "+(d_date.value||todayStr()), cur);
   if(v===null) return;
   const n=Number(v);
   if(!n||n<0){alert("숫자로 입력해주세요.");return;}
@@ -653,7 +678,7 @@ odoFixBtn.onclick=()=>{
       "[확인] 기록을 빠뜨린 운행이 있다 → 운행 한 줄로 추가\n"+
       "[취소] 그냥 계기판 오차다 → 숫자만 맞춤");
     if(yes){
-      const dt=prompt("그 운행을 언제로 넣을까요? (YYYY-MM-DD)", todayStr());
+      const dt=prompt("그 운행을 언제로 넣을까요? (YYYY-MM-DD)", d_date.value||todayStr());
       if(dt===null) return;
       const date=/^\d{4}-\d{2}-\d{2}$/.test(dt)? dt : todayStr();
       const isWork=confirm("그 운행의 용도는?\n\n[확인] 업무용\n[취소] 출퇴근용");
@@ -664,7 +689,8 @@ odoFixBtn.onclick=()=>{
       return;
     }
   }
-  dEntries.push({id:uid(),kind:"fix",date:todayStr(),seq:Date.now(),odo:n,diff});
+  const fixDate = d_date.value || todayStr();
+  dEntries.push({id:uid(),kind:"fix",date:fixDate,seq:Date.now(),odo:n,diff});
   dSave(); dRenderMonths(); dRender();
 };
 dAddBtn.onclick=()=>{
@@ -742,6 +768,15 @@ function showScreen(m){
 goExpense.onclick=()=>showScreen("expense");
 goDrive.onclick=()=>showScreen("drive");
 homeLink.onclick=()=>showScreen("home");
+
+// 숫자 칸에는 숫자만 들어가게 (문자 입력 차단)
+document.querySelectorAll("input.num").forEach(el=>{
+  el.setAttribute("inputmode","numeric");
+  el.addEventListener("input",()=>{
+    const v=el.value.replace(/[^0-9]/g,"");
+    if(el.value!==v) el.value=v;
+  });
+});
 
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
