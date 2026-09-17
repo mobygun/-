@@ -12,6 +12,8 @@
 <title>현장 경비 지출대장</title>
 <script src="./template.js"></script>
 <script src="./xlsxbuild.js"></script>
+<script src="./template2.js"></script>
+<script src="./drivebuild.js"></script>
 <style>
   :root{
     --paper:#EEEBE1; --card:#FFFFFF; --ink:#20221B; --muted:#736C58;
@@ -82,6 +84,20 @@
   .modal h3{margin:0 0 10px;font-size:15px;}
   .editbar{display:flex;gap:8px;}
   .small{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .home-btn{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);
+    border-radius:12px;padding:20px 18px;margin-bottom:12px;font-family:inherit;}
+  .home-btn .t{font-size:17px;font-weight:700;color:var(--ink);}
+  .home-btn .d{font-size:12.5px;color:var(--muted);margin-top:4px;}
+  .backlink{background:none;border:none;color:#C9C2AC;font-size:13px;padding:0;font-family:inherit;}
+  .routes{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
+  .route{border:1px solid var(--line);background:#FBFAF6;border-radius:18px;padding:8px 12px;
+    font-size:13px;color:var(--ink);font-family:inherit;}
+  .route.add{border-style:dashed;color:var(--muted);}
+  .odo{background:#F4F1E8;border:1px solid var(--line);border-radius:9px;padding:10px 12px;
+    font-size:13px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .odo b{font-variant-numeric:tabular-nums;font-size:15px;}
+  .odo button{background:none;border:1px solid var(--line);border-radius:7px;padding:5px 9px;
+    font-size:12px;color:var(--muted);font-family:inherit;}
 </style>
 </head>
 <body>
@@ -89,14 +105,26 @@
 <header class="top">
   <div class="inner">
     <div>
-      <h1 id="titleLine">현장 경비 지출대장</h1>
+      <button class="backlink" id="homeLink" type="button" style="display:none;">‹ 처음으로</button>
+      <h1 id="titleLine">티에스코어 업무 기록</h1>
       <div class="sub" id="subLine">불러오는 중…</div>
     </div>
     <button id="backupBtn" type="button">백업</button>
   </div>
 </header>
 
-<div class="wrap">
+<div class="wrap" id="screenHome">
+  <button class="home-btn" id="goExpense" type="button">
+    <div class="t">현장 경비 지출대장</div>
+    <div class="d">식대·주유비 등 경비 영수증 기록</div>
+  </button>
+  <button class="home-btn" id="goDrive" type="button">
+    <div class="t">차량 운행기록부</div>
+    <div class="d">업무용 차량 운행거리 기록</div>
+  </button>
+</div>
+
+<div class="wrap" id="screenExpense" style="display:none;">
 
   <div class="card" id="settingsPanel">
     <h2>현장 정보 (엑셀 상단에 자동으로 들어갑니다)</h2>
@@ -165,6 +193,67 @@
   </div>
 
   <div class="hint">기록은 이 폰 안에 저장돼요. 인터넷이 없어도 열리고, 앱을 껐다 켜도 남아 있습니다.<br>컴퓨터로 옮길 땐 <b>공유하기</b> → 카카오톡 <b>나와의 채팅</b>으로 보내면 가장 빠릅니다.</div>
+</div>
+
+<div class="wrap" id="screenDrive" style="display:none;">
+
+  <div class="card">
+    <h2>차량 정보 (엑셀 상단에 자동으로 들어갑니다)</h2>
+    <div class="row2">
+      <div class="field"><label>차종</label><input type="text" id="d_carType" placeholder="예: 스타렉스"></div>
+      <div class="field"><label>자동차등록번호</label><input type="text" id="d_carNo" placeholder="예: 141호 7877"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>부서</label><input type="text" id="d_dept" placeholder="예: 인프라공사부"></div>
+      <div class="field"><label>성명</label><input type="text" id="d_name" placeholder="예: 홍길동"></div>
+    </div>
+    <button class="btn btn-ghost" id="dSaveSettings" type="button">저장</button>
+  </div>
+
+  <div class="card">
+    <h2 id="dFormTitle">운행 입력</h2>
+
+    <div class="odo">
+      <span>현재 계기판 <b id="odoNow">-</b> km</span>
+      <button id="odoFixBtn" type="button">실제 값으로 보정</button>
+    </div>
+
+    <div class="field"><label>날짜</label><input type="date" id="d_date"></div>
+
+    <div class="field">
+      <label>자주 가는 경로 (누르면 거리가 자동 입력됩니다)</label>
+      <div class="routes" id="routeList"></div>
+    </div>
+
+    <div class="row2">
+      <div class="field"><label>주행거리 (km)</label><input type="number" id="d_dist" placeholder="예: 52" inputmode="numeric"></div>
+      <div class="field"><label>구분</label>
+        <select id="d_purpose">
+          <option value="업무용">업무용</option>
+          <option value="출퇴근용">출퇴근용</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field"><label>비고 (어디를 다녀왔는지)</label><input type="text" id="d_note" placeholder="예: 본사-평택현장-본사"></div>
+
+    <div class="editbar">
+      <button class="btn btn-primary" id="dAddBtn" type="button">추가</button>
+      <button class="btn btn-ghost" id="dCancelBtn" type="button" style="display:none;">취소</button>
+    </div>
+  </div>
+
+  <div class="monthbar">
+    <select id="dMonthSelect"></select>
+    <div class="count" id="dEntryCount"></div>
+  </div>
+
+  <div class="card" style="padding:6px 12px 12px;">
+    <div class="ledger" id="dLedger"></div>
+    <div class="totals" id="dTotals"></div>
+  </div>
+
+  <div class="hint">계기판 숫자를 몰라도 됩니다. 거리만 넣으면 앱이 이어서 계산해요.<br>가끔 실제 계기판을 봤을 때 <b>보정</b>만 눌러주세요.</div>
 </div>
 
 <div class="actionbar">
@@ -364,6 +453,10 @@ importFile.onchange=(ev)=>{
 };
 
 function defaultName(){
+  if(MODE==="drive"){
+    const [dy,dmo]=dMonthSelect.value.split("-");
+    return dy+"_"+Number(dmo)+"월_차량운행기록부_"+(dSettings.name||"본인이름");
+  }
   const [y,mo]=monthSelect.value.split("-");
   return y+"_"+Number(mo)+"월_경비_"+(settings.writer||"본인이름");
 }
@@ -377,10 +470,13 @@ modalCancel.onclick=()=>nameModalBg.classList.remove("open");
 modalOk.onclick=async()=>{
   const name=(fileNameInput.value.trim()||defaultName())+".xlsx";
   nameModalBg.classList.remove("open");
-  const [y,mo]=monthSelect.value.split("-");
+  const sel = (MODE==="drive"? dMonthSelect : monthSelect).value;
+  const [y,mo]=sel.split("-");
   let blob;
   try{
-    blob = window.buildExpenseXlsx(curList(), settings, y, Number(mo));
+    blob = MODE==="drive"
+      ? window.buildDriveXlsx(dDaysForExport(), dSettings, y, Number(mo))
+      : window.buildExpenseXlsx(curList(), settings, y, Number(mo));
   }catch(err){
     alert("엑셀을 만들지 못했어요. 앱을 완전히 껐다가 다시 열어주세요.");
     return;
@@ -400,13 +496,196 @@ modalOk.onclick=async()=>{
   }
   dl(blob,name);
 };
-exportBtn.onclick=()=>{ if(curList().length===0){alert("이 달에 입력된 기록이 없어요.");return;} openModal("download"); };
-shareBtn.onclick=()=>{ if(curList().length===0){alert("이 달에 입력된 기록이 없어요.");return;} openModal("share"); };
+exportBtn.onclick=()=>{ if((MODE==="drive"?dCurList():curList()).length===0){alert("이 달에 입력된 기록이 없어요.");return;} openModal("download"); };
+shareBtn.onclick=()=>{ if((MODE==="drive"?dCurList():curList()).length===0){alert("이 달에 입력된 기록이 없어요.");return;} openModal("share"); };
+
+
+/* ================= 차량 운행기록부 ================= */
+const KEY_D = "gyeongbi_drive", KEY_DS = "gyeongbi_drive_settings", KEY_DR = "gyeongbi_routes";
+let dEntries = [], dRoutes = [];
+let dSettings = {carType:"",carNo:"",dept:"",name:"",odoBase:0};
+let dEditingId = null;
+
+function dLoad(){
+  try{ dEntries = JSON.parse(localStorage.getItem(KEY_D)||"[]"); }catch(e){ dEntries=[]; }
+  try{ const v=localStorage.getItem(KEY_DS); if(v) dSettings=Object.assign(dSettings,JSON.parse(v)); }catch(e){}
+  try{ dRoutes = JSON.parse(localStorage.getItem(KEY_DR)||"[]"); }catch(e){ dRoutes=[]; }
+  d_carType.value=dSettings.carType||""; d_carNo.value=dSettings.carNo||"";
+  d_dept.value=dSettings.dept||""; d_name.value=dSettings.name||"";
+  d_date.value=todayStr();
+  dRenderMonths(); dRenderRoutes(); dRender();
+}
+function dSave(){
+  dEntries.sort((a,b)=>a.date.localeCompare(b.date)||(a.seq-b.seq));
+  try{ localStorage.setItem(KEY_D, JSON.stringify(dEntries)); }
+  catch(e){ alert("저장 공간이 부족합니다."); }
+}
+function dSaveSettingsFn(){ localStorage.setItem(KEY_DS, JSON.stringify(dSettings)); }
+function dSaveRoutes(){ localStorage.setItem(KEY_DR, JSON.stringify(dRoutes)); }
+
+// 계기판 누적 계산: 기준값에서 시작해 날짜순으로 거리를 더해 나감
+function dChain(){
+  let run = Number(dSettings.odoBase)||0;
+  const list = dEntries.slice().sort((a,b)=>a.date.localeCompare(b.date)||(a.seq-b.seq));
+  const out = [];
+  list.forEach(e=>{
+    if(e.kind==="fix"){ run = Number(e.odo)||run; out.push({...e, before:run, after:run}); return; }
+    const before = run, after = run + (Number(e.dist)||0);
+    run = after;
+    out.push({...e, before, after});
+  });
+  return {list: out, current: run};
+}
+function dCurrentOdo(){ return dChain().current; }
+
+function dAllMonths(){
+  const s=new Set(dEntries.map(e=>monthOf(e.date))); s.add(monthOf(todayStr()));
+  return [...s].sort().reverse();
+}
+function dRenderMonths(){
+  const prev=dMonthSelect.value, ms=dAllMonths();
+  dMonthSelect.innerHTML = ms.map(m=>{const[y,mo]=m.split("-");return '<option value="'+m+'">'+y+'년 '+Number(mo)+'월</option>';}).join("");
+  dMonthSelect.value = ms.includes(prev)?prev:monthOf(todayStr());
+}
+function dCurList(){
+  const m=dMonthSelect.value;
+  return dChain().list.filter(e=>monthOf(e.date)===m && e.kind!=="fix");
+}
+function dRenderRoutes(){
+  routeList.innerHTML = dRoutes.map((r,i)=>
+    '<button class="route" data-i="'+i+'" type="button">'+esc(r.name)+' · '+r.dist+'km</button>').join("")
+    + '<button class="route add" id="routeAdd" type="button">+ 경로 등록</button>';
+  routeList.querySelectorAll(".route[data-i]").forEach(b=>{
+    b.onclick=()=>{
+      const r=dRoutes[+b.dataset.i];
+      d_dist.value=r.dist; d_note.value=r.name; d_purpose.value=r.purpose||"업무용";
+    };
+    b.oncontextmenu=(ev)=>{
+      ev.preventDefault();
+      if(confirm('"'+dRoutes[+b.dataset.i].name+'" 경로를 삭제할까요?')){
+        dRoutes.splice(+b.dataset.i,1); dSaveRoutes(); dRenderRoutes();
+      }
+    };
+  });
+  const addBtn=document.getElementById("routeAdd");
+  addBtn.onclick=()=>{
+    const name=prompt("경로 이름 (예: 본사-평택현장-본사)"); if(!name)return;
+    const dist=Number(prompt("왕복 거리 (km)")); if(!dist||dist<=0){alert("거리를 숫자로 입력해주세요.");return;}
+    dRoutes.push({name:name.trim(),dist,purpose:"업무용"}); dSaveRoutes(); dRenderRoutes();
+  };
+}
+function dRender(){
+  odoNow.textContent = fmtWon(dCurrentOdo());
+  const list=dCurList();
+  dEntryCount.textContent=list.length+"건";
+  dLedger.innerHTML = list.length===0
+    ? '<div class="empty">이 달 운행 기록이 없어요.</div>'
+    : list.map(e=>'<div class="entry" data-id="'+e.id+'">'+
+        '<div class="date">'+e.date.slice(5).replace("-",".")+'</div>'+
+        '<div class="mid">'+
+          '<div class="cat">'+e.dist+' km</div>'+
+          (e.note?'<div class="vendor">'+esc(e.note)+'</div>':"")+
+          '<div class="note">'+fmtWon(e.before)+' → '+fmtWon(e.after)+' km</div>'+
+          '<span class="tag '+(e.purpose==="업무용"?"corp":"cash")+'">'+esc(e.purpose)+'</span>'+
+        '</div>'+
+        '<div class="right"><button class="del" data-act="ddel" data-id="'+e.id+'">삭제</button></div>'+
+      '</div>').join("");
+  const work=list.filter(e=>e.purpose==="업무용").reduce((s,e)=>s+ +e.dist,0);
+  const comm=list.filter(e=>e.purpose!=="업무용").reduce((s,e)=>s+ +e.dist,0);
+  const tot=work+comm;
+  dTotals.innerHTML=
+    '<div class="line"><span>업무용</span><span class="val">'+fmtWon(work)+' km</span></div>'+
+    '<div class="line"><span>출퇴근용</span><span class="val">'+fmtWon(comm)+' km</span></div>'+
+    '<div class="line grand"><span>총 주행거리</span><span class="val">'+fmtWon(tot)+' km</span></div>'+
+    '<div class="line"><span>업무사용비율</span><span class="val">'+(tot? Math.round(work/tot*100):0)+'%</span></div>';
+  dLedger.querySelectorAll('[data-act="ddel"]').forEach(b=>b.onclick=(ev)=>{
+    ev.stopPropagation();
+    if(!confirm("이 기록을 삭제할까요?"))return;
+    dEntries=dEntries.filter(x=>x.id!==b.dataset.id); dSave(); dRenderMonths(); dRender();
+  });
+}
+
+dSaveSettings.onclick=()=>{
+  dSettings.carType=d_carType.value.trim(); dSettings.carNo=d_carNo.value.trim();
+  dSettings.dept=d_dept.value.trim(); dSettings.name=d_name.value.trim();
+  dSaveSettingsFn();
+  dSaveSettings.textContent="저장됨"; setTimeout(()=>{dSaveSettings.textContent="저장";},1500);
+};
+odoFixBtn.onclick=()=>{
+  const v=prompt("지금 계기판에 표시된 숫자를 입력하세요 (km)", dCurrentOdo());
+  if(v===null) return;
+  const n=Number(v);
+  if(!n||n<0){alert("숫자로 입력해주세요.");return;}
+  dEntries.push({id:uid(),kind:"fix",date:todayStr(),seq:Date.now(),odo:n});
+  dSave(); dRender();
+};
+dAddBtn.onclick=()=>{
+  const date=d_date.value, dist=Number(d_dist.value), note=d_note.value.trim(), purpose=d_purpose.value;
+  if(!date){alert("날짜를 입력해주세요.");return;}
+  if(!dist||dist<=0){alert("주행거리를 입력해주세요.");return;}
+  const diffDays=Math.abs(new Date(date)-new Date(todayStr()))/86400000;
+  if(diffDays>365 && !confirm(date+" 날짜가 맞나요?\n오늘과 1년 이상 차이가 납니다.")) return;
+  if(dEditingId){
+    const i=dEntries.findIndex(e=>e.id===dEditingId);
+    if(i>-1) dEntries[i]={...dEntries[i],date,dist,note,purpose};
+  }else{
+    dEntries.push({id:uid(),kind:"trip",date,seq:Date.now(),dist,note,purpose});
+  }
+  dSave(); dStopEdit(); dRenderMonths(); dMonthSelect.value=monthOf(date); dRender();
+};
+function dStopEdit(){
+  dEditingId=null; dFormTitle.textContent="운행 입력"; dAddBtn.textContent="추가";
+  dCancelBtn.style.display="none";
+  d_dist.value=""; d_note.value=""; d_date.value=todayStr();
+}
+dCancelBtn.onclick=dStopEdit;
+dMonthSelect.onchange=dRender;
+
+// 하루 단위로 묶어서 엑셀용 데이터 생성
+function dDaysForExport(){
+  const m=dMonthSelect.value, days={};
+  dChain().list.filter(e=>e.kind!=="fix" && monthOf(e.date)===m).forEach(e=>{
+    const d = days[e.date] || (days[e.date]={before:e.before, after:e.after, work:0, commute:0,
+      dept:dSettings.dept, name:dSettings.name, notes:[]});
+    d.before=Math.min(d.before,e.before); d.after=Math.max(d.after,e.after);
+    if(e.purpose==="업무용") d.work += Number(e.dist)||0; else d.commute += Number(e.dist)||0;
+    if(e.note) d.notes.push(e.note);
+  });
+  Object.values(days).forEach(d=>{ d.note=d.notes.join(", "); delete d.notes; });
+  return days;
+}
+
+
+/* ================= 화면 전환 ================= */
+let MODE = "home";
+function showScreen(m){
+  MODE = m;
+  screenHome.style.display  = m==="home"    ? "block":"none";
+  screenExpense.style.display = m==="expense" ? "block":"none";
+  screenDrive.style.display = m==="drive"   ? "block":"none";
+  document.querySelector(".actionbar").style.display = m==="home" ? "none":"block";
+  homeLink.style.display = m==="home" ? "none":"block";
+  backupBtn.style.display = m==="home" ? "none":"block";
+  backupPanel.classList.remove("open");
+  titleLine.textContent = m==="expense" ? "현장 경비 지출대장"
+                        : m==="drive"   ? "차량 운행기록부"
+                        : "티에스코어 업무 기록";
+  if(m==="expense"){ renderHeader(); render(); }
+  if(m==="drive"){ dRender(); subLine.textContent = (dSettings.carNo? dSettings.carNo+" · ":"") + "총 "+dEntries.filter(e=>e.kind!=="fix").length+"건 저장됨"; }
+  if(m==="home"){ subLine.textContent = "무엇을 기록할까요?"; }
+  window.scrollTo(0,0);
+  try{ localStorage.setItem("gyeongbi_mode", m); }catch(e){}
+}
+goExpense.onclick=()=>showScreen("expense");
+goDrive.onclick=()=>showScreen("drive");
+homeLink.onclick=()=>showScreen("home");
 
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 }
 load();
+dLoad();
+showScreen("home");
 </script>
 </body>
 </html>
