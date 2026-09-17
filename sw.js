@@ -1,4 +1,4 @@
-const CACHE = "gyeongbi-v15";
+const CACHE = "gyeongbi-v16";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./template.js", "./xlsxbuild.js", "./template2.js", "./drivebuild.js", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {

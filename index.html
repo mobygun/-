@@ -224,6 +224,8 @@
       <div class="field"><label>부서</label><input type="text" id="d_dept" placeholder="예: 인프라공사부"></div>
       <div class="field"><label>성명</label><input type="text" id="d_name" placeholder="예: 홍길동"></div>
     </div>
+    <div class="field"><label>시작 계기판 (처음 한 번만, km)</label>
+      <input type="text" class="num" id="d_odoBase" placeholder="예: 11150"></div>
     <button class="btn btn-ghost" id="dSaveSettings" type="button">저장</button>
   </div>
 
@@ -540,6 +542,7 @@ function dLoad(){
   try{ dRoutes = JSON.parse(localStorage.getItem(KEY_DR)||"[]"); }catch(e){ dRoutes=[]; }
   d_carType.value=dSettings.carType||""; d_carNo.value=dSettings.carNo||"";
   d_dept.value=dSettings.dept||""; d_name.value=dSettings.name||"";
+  d_odoBase.value=dSettings.odoBase? dSettings.odoBase : "";
   d_date.value=todayStr();
   dRenderMonths(); dRenderRoutes(); dRender();
 }
@@ -661,7 +664,8 @@ function dRender(){
 dSaveSettings.onclick=()=>{
   dSettings.carType=d_carType.value.trim(); dSettings.carNo=d_carNo.value.trim();
   dSettings.dept=d_dept.value.trim(); dSettings.name=d_name.value.trim();
-  dSaveSettingsFn();
+  dSettings.odoBase=Number(d_odoBase.value)||0;
+  dSaveSettingsFn(); dRender();
   dSaveSettings.textContent="저장됨"; setTimeout(()=>{dSaveSettings.textContent="저장";},1500);
 };
 odoFixBtn.onclick=()=>{
@@ -670,6 +674,13 @@ odoFixBtn.onclick=()=>{
   if(v===null) return;
   const n=Number(v);
   if(!n||n<0){alert("숫자로 입력해주세요.");return;}
+  const hasTrip = dEntries.some(e=>e.kind!=="fix");
+  // 처음 쓰는 경우(시작값 없음) → 보정이 아니라 '시작 계기판'으로 저장
+  if(!dSettings.odoBase && !hasTrip){
+    dSettings.odoBase=n; d_odoBase.value=n; dSaveSettingsFn(); dRender();
+    alert("시작 계기판을 "+fmtWon(n)+"km 로 저장했습니다.\n앞으로는 거리만 입력하면 여기서부터 이어집니다.");
+    return;
+  }
   const diff=n-cur;
   if(diff===0){ alert("계기판과 앱의 숫자가 이미 같습니다."); return; }
 
@@ -697,6 +708,10 @@ dAddBtn.onclick=()=>{
   const date=d_date.value, dist=Number(d_dist.value), note=d_note.value.trim(), purpose=d_purpose.value;
   if(!date){alert("날짜를 입력해주세요.");return;}
   if(!dist||dist<=0){alert("주행거리를 입력해주세요.");return;}
+  if(!dSettings.odoBase && !dEntries.some(e=>e.kind!=="fix")){
+    alert("먼저 위 '차량 정보'에서 시작 계기판 숫자를 넣고 저장해주세요.\n(지금 계기판에 찍힌 숫자)");
+    d_odoBase.focus(); return;
+  }
   const diffDays=Math.abs(new Date(date)-new Date(todayStr()))/86400000;
   if(diffDays>365 && !confirm(date+" 날짜가 맞나요?\n오늘과 1년 이상 차이가 납니다.")) return;
   const cost={fuel:Number(d_fuel.value)||0, toll:Number(d_toll.value)||0,
