@@ -14,6 +14,7 @@
 <script src="./xlsxbuild.js"></script>
 <script src="./template2.js"></script>
 <script src="./drivebuild.js"></script>
+<script src="./sync.js"></script>
 <style>
   :root{
     --paper:#EEEBE1; --card:#FFFFFF; --ink:#20221B; --muted:#736C58;
@@ -70,7 +71,11 @@
   .tag.corp{background:var(--corp);} .tag.cash{background:var(--cash);}
   .entry .right{text-align:right;flex-shrink:0;}
   .entry .amt{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;}
-  .entry .del{background:none;border:none;color:var(--danger);font-size:12px;padding:4px 0 0;font-family:inherit;}
+  .entry{padding:14px 2px;}
+  .entry .acts{display:flex;flex-direction:column;gap:8px;margin-top:6px;align-items:flex-end;}
+  .entry .act{min-width:58px;min-height:38px;border-radius:8px;border:1px solid var(--line);
+    background:#FBFAF6;font-size:13px;font-family:inherit;color:var(--ink);}
+  .entry .act.del{border-color:#E2A79B;color:var(--danger);}
   .empty{padding:30px 4px;text-align:center;color:var(--muted);font-size:13px;}
   .totals .line{display:flex;justify-content:space-between;padding:5px 2px;font-size:13.5px;}
   .totals .line.grand{border-top:1px solid var(--ink);margin-top:4px;padding-top:9px;font-size:16px;font-weight:700;}
@@ -107,6 +112,26 @@
   .warn{background:#FCEFEC;border:1px solid #E2A79B;border-radius:9px;padding:10px 12px;
     font-size:12.5px;color:var(--danger);line-height:1.5;margin-bottom:10px;}
   .warn b{font-weight:700;}
+  .profbar{display:flex;gap:6px;align-items:center;margin-bottom:12px;}
+  .profbar select{flex:1;min-width:0;padding:11px 10px;border:1px solid var(--line);
+    border-radius:8px;background:#FBFAF6;font-size:15px;font-family:inherit;color:var(--ink);}
+  .profbar button{min-height:44px;min-width:44px;border:1px solid var(--line);background:var(--card);
+    border-radius:8px;font-size:13px;font-family:inherit;color:var(--ink);padding:0 10px;}
+  .install{display:none;width:100%;margin-bottom:12px;padding:14px;border:none;border-radius:10px;
+    background:var(--accent);color:#fff;font-size:15px;font-weight:700;font-family:inherit;}
+  .installhelp{display:none;background:#FFF8E8;border:1px solid #E0C88A;border-radius:10px;
+    padding:12px 14px;font-size:12.5px;color:#5A4A22;line-height:1.6;margin-bottom:12px;}
+  .loginbar{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);
+    border-radius:10px;padding:12px 14px;margin-bottom:12px;}
+  .loginbar .who{flex:1;min-width:0;font-size:13px;color:var(--muted);line-height:1.4;}
+  .loginbar .who b{color:var(--ink);font-size:14px;}
+  .loginbar button{min-height:40px;border:1px solid var(--line);background:#FBFAF6;border-radius:8px;
+    padding:0 12px;font-size:13px;font-family:inherit;color:var(--ink);}
+  .adminbar{display:none;margin-bottom:12px;}
+  .adminbar select{width:100%;padding:11px 10px;border:1px solid var(--line);border-radius:8px;
+    background:#FBFAF6;font-size:15px;font-family:inherit;}
+  .ro{display:none;background:#EEF2F7;border:1px solid #B9C6D6;border-radius:9px;padding:10px 12px;
+    font-size:12.5px;color:#39506B;margin-bottom:12px;}
   .warnrow{display:flex;align-items:center;gap:6px;margin-top:4px;}
   .warnrow span{flex:1;}
   .warndel{margin-left:auto;flex-shrink:0;background:#fff;border:1px solid #E2A79B;
@@ -131,6 +156,18 @@
 </header>
 
 <div class="wrap" id="screenHome">
+  <button class="install" id="installBtn" type="button">홈 화면에 앱으로 설치하기</button>
+  <div class="installhelp" id="installHelp"></div>
+
+  <div class="loginbar">
+    <div class="who" id="loginWho">이 폰에만 저장 중<br><span style="font-size:11.5px;">로그인하면 컴퓨터에서도 볼 수 있어요</span></div>
+    <button id="loginBtn" type="button">로그인</button>
+  </div>
+
+  <div class="adminbar" id="adminBar">
+    <select id="adminUserSelect"></select>
+  </div>
+  <div class="ro" id="roNotice">다른 직원의 기록을 보는 중입니다. 수정·추가는 안 되고 엑셀 저장만 됩니다.</div>
   <button class="home-btn" id="goExpense" type="button">
     <div class="t">현장 경비 지출대장</div>
     <div class="d">식대·주유비 등 경비 영수증 기록</div>
@@ -143,8 +180,14 @@
 
 <div class="wrap" id="screenExpense" style="display:none;">
 
+  <div class="profbar">
+    <select id="siteSelect"></select>
+    <button id="siteAdd" type="button">+ 현장</button>
+    <button id="siteDel" type="button">삭제</button>
+  </div>
+
   <div class="card" id="settingsPanel">
-    <h2>현장 정보 (엑셀 상단에 자동으로 들어갑니다)</h2>
+    <h2>현장 정보 (선택한 현장의 내용을 고칩니다)</h2>
     <div class="row2">
       <div class="field"><label>현장명</label><input type="text" id="siteName" placeholder="예: 본사"></div>
       <div class="field"><label>부서명</label><input type="text" id="dept" placeholder="예: 인프라공사부"></div>
@@ -162,6 +205,7 @@
     <button class="btn btn-ghost" id="importJsonBtn" type="button">백업 파일에서 되살리기</button>
     <input type="file" id="importFile" accept=".json" style="display:none;">
     <div class="small">폰을 바꾸거나 앱을 지우기 전에 백업 파일을 받아두면, 새 폰에서 그대로 되살릴 수 있어요.</div>
+    <button class="btn btn-ghost" id="diagBtn" type="button" style="margin-top:10px;">내 폰 상태 확인 (문제 생겼을 때)</button>
   </div>
 
   <div class="card">
@@ -214,8 +258,14 @@
 
 <div class="wrap" id="screenDrive" style="display:none;">
 
+  <div class="profbar">
+    <select id="vehSelect"></select>
+    <button id="vehAdd" type="button">+ 차량</button>
+    <button id="vehDel" type="button">삭제</button>
+  </div>
+
   <div class="card">
-    <h2>차량 정보 (엑셀 상단에 자동으로 들어갑니다)</h2>
+    <h2>차량 정보 (선택한 차량의 내용을 고칩니다)</h2>
     <div class="row2">
       <div class="field"><label>차종</label><input type="text" id="d_carType" placeholder="예: 스타렉스"></div>
       <div class="field"><label>자동차등록번호</label><input type="text" id="d_carNo" placeholder="예: 141호 7877"></div>
@@ -293,6 +343,21 @@
   </div>
 </div>
 
+<div class="modal-bg" id="loginModalBg">
+  <div class="modal">
+    <h3 id="loginTitle">로그인</h3>
+    <div class="field"><label>아이디</label><input type="text" id="lg_id" placeholder="예: hongkildong" autocapitalize="none"></div>
+    <div class="field"><label>비밀번호 (6자 이상)</label><input type="password" id="lg_pw" placeholder="비밀번호"></div>
+    <div class="field" id="lg_nameWrap" style="display:none;"><label>이름</label><input type="text" id="lg_name" placeholder="예: 홍길동"></div>
+    <div class="editbar">
+      <button class="btn btn-ghost" id="lgCancel" type="button">취소</button>
+      <button class="btn btn-primary" id="lgOk" type="button">로그인</button>
+    </div>
+    <div class="small" id="lgSwitch" style="text-align:center;cursor:pointer;color:var(--accent);">계정이 없으신가요? 회원가입</div>
+    <div class="small" id="lgMsg" style="color:var(--danger);"></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="nameModalBg">
   <div class="modal">
     <h3 id="modalTitle">파일 이름</h3>
@@ -308,6 +373,7 @@
 const KEY_E = "gyeongbi_entries", KEY_S = "gyeongbi_settings";
 let entries = [], settings = {siteName:"",dept:"",cardNumber:"",writer:""};
 let selectedPay = "법인카드", editingId = null, pendingAction = null;
+let lastShareError = "";
 
 function todayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function fmtWon(n){return Number(n||0).toLocaleString("ko-KR");}
@@ -337,10 +403,64 @@ function migrateCats(){
   if(changed) saveEntries();
 }
 
+const KEY_SITES="gyeongbi_sites", KEY_CURSITE="gyeongbi_cursite";
+let sites=[], curSiteId=null;
+
+function saveSites(){ localStorage.setItem(KEY_SITES, JSON.stringify(sites)); if(typeof syncPush==="function") syncPush(); }
+function curSite(){ return sites.find(x=>x.id===curSiteId) || sites[0]; }
+
+function loadSites(){
+  try{ sites=JSON.parse(localStorage.getItem(KEY_SITES)||"[]"); }catch(e){ sites=[]; }
+  if(!sites.length){
+    let old={}; try{ old=JSON.parse(localStorage.getItem(KEY_S)||"{}"); }catch(e){}
+    sites=[{id:uid(), siteName:old.siteName||"", dept:old.dept||"",
+            cardNumber:old.cardNumber||"", writer:old.writer||""}];
+    saveSites();
+  }
+  curSiteId = localStorage.getItem(KEY_CURSITE);
+  if(!sites.some(x=>x.id===curSiteId)) curSiteId = sites[0].id;
+  let changed=false;
+  entries.forEach(e=>{ if(!e.siteId){ e.siteId=sites[0].id; changed=true; } });
+  if(changed) saveEntries();
+  settings = curSite();
+}
+function renderSiteSelect(){
+  siteSelect.innerHTML = sites.map(x=>
+    '<option value="'+x.id+'">'+esc(x.siteName||"(이름 없는 현장)")+
+    (x.writer? " · "+esc(x.writer):"")+'</option>').join("");
+  siteSelect.value = curSiteId;
+}
+siteSelect.onchange=()=>{
+  curSiteId=siteSelect.value; localStorage.setItem(KEY_CURSITE,curSiteId);
+  settings=curSite();
+  siteName.value=settings.siteName||""; dept.value=settings.dept||"";
+  cardNumber.value=settings.cardNumber||""; writer.value=settings.writer||"";
+  stopEdit(); renderMonths(); render();
+};
+siteAdd.onclick=()=>{
+  const nm=prompt("새 현장 이름"); if(nm===null) return;
+  const o={id:uid(), siteName:nm.trim(), dept:"", cardNumber:"", writer:""};
+  sites.push(o); saveSites();
+  curSiteId=o.id; localStorage.setItem(KEY_CURSITE,curSiteId);
+  settings=o; renderSiteSelect(); siteSelect.onchange();
+};
+siteDel.onclick=()=>{
+  if(sites.length<=1){ alert("현장이 하나뿐이라 지울 수 없어요."); return; }
+  const cnt=entries.filter(e=>e.siteId===curSiteId).length;
+  if(!confirm('"'+(curSite().siteName||"이름 없는 현장")+'" 를 지울까요?\n'+
+    (cnt? "이 현장의 기록 "+cnt+"건도 함께 지워집니다.":"기록은 없습니다."))) return;
+  entries=entries.filter(e=>e.siteId!==curSiteId);
+  sites=sites.filter(x=>x.id!==curSiteId);
+  saveEntries(); saveSites();
+  curSiteId=sites[0].id; localStorage.setItem(KEY_CURSITE,curSiteId);
+  renderSiteSelect(); siteSelect.onchange();
+};
+
 function load(){
   try{ entries = JSON.parse(localStorage.getItem(KEY_E)||"[]"); }catch(e){ entries=[]; }
   migrateCats();
-  try{ const s=localStorage.getItem(KEY_S); if(s) settings=JSON.parse(s); }catch(e){}
+  loadSites();
+  renderSiteSelect();
   siteName.value=settings.siteName||""; dept.value=settings.dept||"";
   cardNumber.value=settings.cardNumber||""; writer.value=settings.writer||"";
   f_date.value=todayStr();
@@ -350,20 +470,22 @@ function saveEntries(){
   entries.sort((a,b)=>a.date.localeCompare(b.date));
   try{ localStorage.setItem(KEY_E, JSON.stringify(entries)); }
   catch(e){ alert("저장 공간이 부족합니다. 백업 후 오래된 기록을 정리해주세요."); }
+  if(typeof syncPush==="function") syncPush();
 }
 function saveSettings(){ localStorage.setItem(KEY_S, JSON.stringify(settings)); }
 
 function renderHeader(){
   titleLine.textContent = settings.siteName ? settings.siteName+" 경비대장" : "현장 경비 지출대장";
-  subLine.textContent = (settings.writer? "작성자 "+settings.writer+" · ":"") + "총 "+entries.length+"건 저장됨";
+  subLine.textContent = (settings.writer? "작성자 "+settings.writer+" · ":"") + "총 "+siteEntries().length+"건 저장됨";
 }
-function allMonths(){const s=new Set(entries.map(e=>monthOf(e.date)));s.add(monthOf(todayStr()));return [...s].sort().reverse();}
+function siteEntries(){ return entries.filter(e=>e.siteId===curSiteId); }
+function allMonths(){const s=new Set(siteEntries().map(e=>monthOf(e.date)));s.add(monthOf(todayStr()));return [...s].sort().reverse();}
 function renderMonths(){
   const prev=monthSelect.value, ms=allMonths();
   monthSelect.innerHTML = ms.map(m=>{const[y,mo]=m.split("-");return '<option value="'+m+'">'+y+'년 '+Number(mo)+'월</option>';}).join("");
   monthSelect.value = ms.includes(prev)?prev:monthOf(todayStr());
 }
-function curList(){const m=monthSelect.value;return entries.filter(e=>monthOf(e.date)===m).sort((a,b)=>a.date.localeCompare(b.date));}
+function curList(){const m=monthSelect.value;return siteEntries().filter(e=>monthOf(e.date)===m).sort((a,b)=>a.date.localeCompare(b.date));}
 
 function render(){
   const list=curList();
@@ -380,7 +502,10 @@ function render(){
         '</div>'+
         '<div class="right">'+
           '<div class="amt">'+fmtWon(e.amount)+'원</div>'+
-          '<button class="del" data-act="del" data-id="'+e.id+'">삭제</button>'+
+          '<div class="acts">'+
+            '<button class="act" data-act="edit" data-id="'+e.id+'">수정</button>'+
+            '<button class="act del" data-act="del" data-id="'+e.id+'">삭제</button>'+
+          '</div>'+
         '</div></div>').join("");
   const corp=list.filter(e=>e.pay==="법인카드").reduce((s,e)=>s+ +e.amount,0);
   const cash=list.filter(e=>e.pay!=="법인카드").reduce((s,e)=>s+ +e.amount,0);
@@ -394,9 +519,7 @@ function render(){
     if(!confirm("이 기록을 삭제할까요?"))return;
     entries=entries.filter(x=>x.id!==b.dataset.id); saveEntries(); renderMonths(); render();
   });
-  ledger.querySelectorAll(".entry").forEach(r=>r.onclick=(ev)=>{
-    if(ev.target.dataset.act==="del")return; startEdit(r.dataset.id);
-  });
+  ledger.querySelectorAll('[data-act="edit"]').forEach(b=>b.onclick=()=>startEdit(b.dataset.id));
 }
 function startEdit(id){
   const e=entries.find(x=>x.id===id); if(!e)return;
@@ -428,8 +551,10 @@ function writeCat(v){
 }
 backupBtn.onclick=()=>{backupPanel.classList.toggle("open");};
 saveSettingsBtn.onclick=()=>{
-  settings={siteName:siteName.value.trim(),dept:dept.value.trim(),cardNumber:cardNumber.value.trim(),writer:writer.value.trim()};
-  saveSettings(); renderHeader();
+  const o=curSite();
+  o.siteName=siteName.value.trim(); o.dept=dept.value.trim();
+  o.cardNumber=cardNumber.value.trim(); o.writer=writer.value.trim();
+  settings=o; saveSites(); renderSiteSelect(); renderHeader();
   saveSettingsBtn.textContent="저장됨";
   setTimeout(()=>{saveSettingsBtn.textContent="저장";},1500);
 };
@@ -446,7 +571,7 @@ addBtn.onclick=()=>{
     const i=entries.findIndex(e=>e.id===editingId);
     if(i>-1) entries[i]={...entries[i],date,cat,vendor,amount,pay:selectedPay,note};
   }else{
-    entries.push({id:uid(),date,cat,vendor,amount,pay:selectedPay,note});
+    entries.push({id:uid(),siteId:curSiteId,date,cat,vendor,amount,pay:selectedPay,note});
   }
   saveEntries(); stopEdit(); renderMonths(); monthSelect.value=monthOf(date); render();
 };
@@ -505,24 +630,35 @@ modalOk.onclick=async()=>{
   let blob;
   try{
     blob = MODE==="drive"
-      ? window.buildDriveXlsx(dDaysForExport(), dSettings, y, Number(mo))
-      : window.buildExpenseXlsx(curList(), settings, y, Number(mo));
+      ? await window.buildDriveXlsx(dDaysForExport(), dSettings, y, Number(mo))
+      : await window.buildExpenseXlsx(curList(), settings, y, Number(mo));
   }catch(err){
     alert("엑셀을 만들지 못했어요. 앱을 완전히 껐다가 다시 열어주세요.");
     return;
   }
   if(pendingAction==="share"){
-    const file=new File([blob],name,{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    const XLSX_MIME="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     // 제목·텍스트를 같이 보내면 카카오톡이 파일 대신 글자만 보냅니다. 파일만 넘깁니다.
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{
-        await navigator.share({files:[file]});
-        return;
-      }catch(e){
-        if(e && e.name==="AbortError") return;
+    if(navigator.share){
+      const tries=[
+        new File([blob],name,{type:XLSX_MIME}),
+        new File([blob],name,{type:"application/octet-stream"})
+      ];
+      for(const file of tries){
+        // canShare 가 없는 브라우저(삼성 인터넷 등)도 있으니, 검사에 걸려도 일단 시도합니다
+        try{
+          await navigator.share({files:[file]});
+          return;
+        }catch(e){
+          if(e && e.name==="AbortError") return;   // 사용자가 직접 취소
+          lastShareError = e ? (e.name+": "+e.message) : "알 수 없음";
+        }
       }
+    }else{
+      lastShareError = "이 브라우저는 공유 기능이 없음";
     }
-    alert("이 기기에서는 바로 공유가 안 돼요.\n파일을 저장할 테니, 원하는 앱에서 '파일 첨부'로 보내주세요.");
+    alert("이 기기에서는 바로 공유가 안 돼요.\n\n파일을 '다운로드' 폴더에 저장할게요.\n"+
+          "카카오톡에서 [+] → [파일] → 다운로드 폴더에서 골라 보내주세요.");
   }
   dl(blob,name);
 };
@@ -536,13 +672,67 @@ let dEntries = [], dRoutes = [];
 let dSettings = {carType:"",carNo:"",dept:"",name:"",odoBase:0};
 let dEditingId = null;
 
-function dLoad(){
-  try{ dEntries = JSON.parse(localStorage.getItem(KEY_D)||"[]"); }catch(e){ dEntries=[]; }
-  try{ const v=localStorage.getItem(KEY_DS); if(v) dSettings=Object.assign(dSettings,JSON.parse(v)); }catch(e){}
-  try{ dRoutes = JSON.parse(localStorage.getItem(KEY_DR)||"[]"); }catch(e){ dRoutes=[]; }
+const KEY_VEH="gyeongbi_vehicles", KEY_CURVEH="gyeongbi_curveh";
+let vehicles=[], curVehId=null;
+
+function saveVehicles(){ localStorage.setItem(KEY_VEH, JSON.stringify(vehicles)); if(typeof syncPush==="function") syncPush(); }
+function curVeh(){ return vehicles.find(x=>x.id===curVehId) || vehicles[0]; }
+
+function loadVehicles(){
+  try{ vehicles=JSON.parse(localStorage.getItem(KEY_VEH)||"[]"); }catch(e){ vehicles=[]; }
+  if(!vehicles.length){
+    let old={}; try{ old=JSON.parse(localStorage.getItem(KEY_DS)||"{}"); }catch(e){}
+    vehicles=[{id:uid(), carType:old.carType||"", carNo:old.carNo||"",
+               dept:old.dept||"", name:old.name||"", odoBase:old.odoBase||0}];
+    saveVehicles();
+  }
+  curVehId = localStorage.getItem(KEY_CURVEH);
+  if(!vehicles.some(x=>x.id===curVehId)) curVehId = vehicles[0].id;
+  let changed=false;
+  dEntries.forEach(e=>{ if(!e.vehId){ e.vehId=vehicles[0].id; changed=true; } });
+  if(changed) dSave();
+  dSettings = curVeh();
+}
+function renderVehSelect(){
+  vehSelect.innerHTML = vehicles.map(x=>
+    '<option value="'+x.id+'">'+esc(x.carNo||"(번호 없는 차량)")+
+    (x.carType? " · "+esc(x.carType):"")+'</option>').join("");
+  vehSelect.value = curVehId;
+}
+function fillVehForm(){
   d_carType.value=dSettings.carType||""; d_carNo.value=dSettings.carNo||"";
   d_dept.value=dSettings.dept||""; d_name.value=dSettings.name||"";
   d_odoBase.value=dSettings.odoBase? dSettings.odoBase : "";
+}
+vehSelect.onchange=()=>{
+  curVehId=vehSelect.value; localStorage.setItem(KEY_CURVEH,curVehId);
+  dSettings=curVeh(); fillVehForm(); dStopEdit(); dRenderMonths(); dRender();
+};
+vehAdd.onclick=()=>{
+  const no=prompt("새 차량의 자동차등록번호"); if(no===null) return;
+  const o={id:uid(), carType:"", carNo:no.trim(), dept:"", name:"", odoBase:0};
+  vehicles.push(o); saveVehicles();
+  curVehId=o.id; localStorage.setItem(KEY_CURVEH,curVehId);
+  dSettings=o; renderVehSelect(); vehSelect.onchange();
+};
+vehDel.onclick=()=>{
+  if(vehicles.length<=1){ alert("차량이 하나뿐이라 지울 수 없어요."); return; }
+  const cnt=dEntries.filter(e=>e.vehId===curVehId && e.kind!=="fix").length;
+  if(!confirm('"'+(curVeh().carNo||"번호 없는 차량")+'" 를 지울까요?\n'+
+    (cnt? "이 차량의 운행 기록 "+cnt+"건도 함께 지워집니다.":"기록은 없습니다."))) return;
+  dEntries=dEntries.filter(e=>e.vehId!==curVehId);
+  vehicles=vehicles.filter(x=>x.id!==curVehId);
+  dSave(); saveVehicles();
+  curVehId=vehicles[0].id; localStorage.setItem(KEY_CURVEH,curVehId);
+  renderVehSelect(); vehSelect.onchange();
+};
+
+function dLoad(){
+  try{ dEntries = JSON.parse(localStorage.getItem(KEY_D)||"[]"); }catch(e){ dEntries=[]; }
+  loadVehicles();
+  renderVehSelect();
+  try{ dRoutes = JSON.parse(localStorage.getItem(KEY_DR)||"[]"); }catch(e){ dRoutes=[]; }
+  fillVehForm();
   d_date.value=todayStr();
   dRenderMonths(); dRenderRoutes(); dRender();
 }
@@ -550,14 +740,15 @@ function dSave(){
   dEntries.sort((a,b)=>a.date.localeCompare(b.date)||(a.seq-b.seq));
   try{ localStorage.setItem(KEY_D, JSON.stringify(dEntries)); }
   catch(e){ alert("저장 공간이 부족합니다."); }
+  if(typeof syncPush==="function") syncPush();
 }
 function dSaveSettingsFn(){ localStorage.setItem(KEY_DS, JSON.stringify(dSettings)); }
-function dSaveRoutes(){ localStorage.setItem(KEY_DR, JSON.stringify(dRoutes)); }
+function dSaveRoutes(){ localStorage.setItem(KEY_DR, JSON.stringify(dRoutes)); if(typeof syncPush==="function") syncPush(); }
 
 // 계기판 누적 계산: 기준값에서 시작해 날짜순으로 거리를 더해 나감
 function dChain(){
   let run = Number(dSettings.odoBase)||0;
-  const list = dEntries.slice().sort((a,b)=>a.date.localeCompare(b.date)||(a.seq-b.seq));
+  const list = dEntries.filter(e=>e.vehId===curVehId).sort((a,b)=>a.date.localeCompare(b.date)||(a.seq-b.seq));
   const out = [];
   list.forEach(e=>{
     if(e.kind==="fix"){ run = Number(e.odo)||run; out.push({...e, before:run, after:run}); return; }
@@ -570,7 +761,7 @@ function dChain(){
 function dCurrentOdo(){ return dChain().current; }
 
 function dAllMonths(){
-  const s=new Set(dEntries.map(e=>monthOf(e.date))); s.add(monthOf(todayStr()));
+  const s=new Set(dEntries.filter(e=>e.vehId===curVehId).map(e=>monthOf(e.date))); s.add(monthOf(todayStr()));
   return [...s].sort().reverse();
 }
 function dRenderMonths(){
@@ -640,7 +831,10 @@ function dRender(){
           '<div class="note">'+fmtWon(e.before)+' → '+fmtWon(e.after)+' km</div>'+
           '<span class="tag '+(e.purpose==="업무용"?"corp":"cash")+'">'+esc(e.purpose)+'</span>'+
         '</div>'+
-        '<div class="right"><button class="del" data-act="ddel" data-id="'+e.id+'">삭제</button></div>'+
+        '<div class="right"><div class="acts">'+
+          '<button class="act" data-act="dedit" data-id="'+e.id+'">수정</button>'+
+          '<button class="act del" data-act="ddel" data-id="'+e.id+'">삭제</button>'+
+        '</div></div>'+
       '</div>').join(""));
   const work=list.filter(e=>e.purpose==="업무용").reduce((s,e)=>s+ +e.dist,0);
   const comm=list.filter(e=>e.purpose!=="업무용").reduce((s,e)=>s+ +e.dist,0);
@@ -649,7 +843,9 @@ function dRender(){
     '<div class="line"><span>업무용</span><span class="val">'+fmtWon(work)+' km</span></div>'+
     '<div class="line"><span>출퇴근용</span><span class="val">'+fmtWon(comm)+' km</span></div>'+
     '<div class="line grand"><span>총 주행거리</span><span class="val">'+fmtWon(tot)+' km</span></div>'+
-    '<div class="line"><span>업무사용비율</span><span class="val">'+(tot? Math.round(work/tot*100):0)+'%</span></div>';
+    '<div class="line"><span>업무용 사용거리 (출퇴근 포함)</span><span class="val">'+fmtWon(tot)+' km</span></div>'+
+    '<div class="line"><span>업무사용비율</span><span class="val">'+(tot?100:0)+'%</span></div>';
+  dLedger.querySelectorAll('[data-act="dedit"]').forEach(b=>b.onclick=()=>dStartEdit(b.dataset.id));
   dLedger.querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>{
     if(!confirm("이 계기판 보정을 취소할까요?\n계기판 숫자가 보정 전 값으로 되돌아갑니다."))return;
     dEntries=dEntries.filter(x=>x.id!==b.dataset.fix); dSave(); dRenderMonths(); dRender();
@@ -662,10 +858,11 @@ function dRender(){
 }
 
 dSaveSettings.onclick=()=>{
-  dSettings.carType=d_carType.value.trim(); dSettings.carNo=d_carNo.value.trim();
-  dSettings.dept=d_dept.value.trim(); dSettings.name=d_name.value.trim();
-  dSettings.odoBase=Number(d_odoBase.value)||0;
-  dSaveSettingsFn(); dRender();
+  const o=curVeh();
+  o.carType=d_carType.value.trim(); o.carNo=d_carNo.value.trim();
+  o.dept=d_dept.value.trim(); o.name=d_name.value.trim();
+  o.odoBase=Number(d_odoBase.value)||0;
+  dSettings=o; saveVehicles(); renderVehSelect(); dRender();
   dSaveSettings.textContent="저장됨"; setTimeout(()=>{dSaveSettings.textContent="저장";},1500);
 };
 odoFixBtn.onclick=()=>{
@@ -674,7 +871,7 @@ odoFixBtn.onclick=()=>{
   if(v===null) return;
   const n=Number(v);
   if(!n||n<0){alert("숫자로 입력해주세요.");return;}
-  const hasTrip = dEntries.some(e=>e.kind!=="fix");
+  const hasTrip = dEntries.some(e=>e.vehId===curVehId && e.kind!=="fix");
   // 처음 쓰는 경우(시작값 없음) → 보정이 아니라 '시작 계기판'으로 저장
   if(!dSettings.odoBase && !hasTrip){
     dSettings.odoBase=n; d_odoBase.value=n; dSaveSettingsFn(); dRender();
@@ -693,7 +890,7 @@ odoFixBtn.onclick=()=>{
       if(dt===null) return;
       const date=/^\d{4}-\d{2}-\d{2}$/.test(dt)? dt : todayStr();
       const isWork=confirm("그 운행의 용도는?\n\n[확인] 업무용\n[취소] 출퇴근용");
-      dEntries.push({id:uid(),kind:"trip",date,seq:Date.now(),dist:diff,
+      dEntries.push({id:uid(),vehId:curVehId,kind:"trip",date,seq:Date.now(),dist:diff,
         note:"기록 누락분 보충", purpose:isWork?"업무용":"출퇴근용", adj:true,
         fuel:0,toll:0,park:0,etc:0});
       dSave(); dRenderMonths(); dMonthSelect.value=monthOf(date); dRender();
@@ -701,14 +898,15 @@ odoFixBtn.onclick=()=>{
     }
   }
   const fixDate = d_date.value || todayStr();
-  dEntries.push({id:uid(),kind:"fix",date:fixDate,seq:Date.now(),odo:n,diff});
+  dEntries.push({id:uid(),vehId:curVehId,kind:"fix",date:fixDate,seq:Date.now(),odo:n,diff});
   dSave(); dRenderMonths(); dRender();
 };
 dAddBtn.onclick=()=>{
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   const date=d_date.value, dist=Number(d_dist.value), note=d_note.value.trim(), purpose=d_purpose.value;
   if(!date){alert("날짜를 입력해주세요.");return;}
   if(!dist||dist<=0){alert("주행거리를 입력해주세요.");return;}
-  if(!dSettings.odoBase && !dEntries.some(e=>e.kind!=="fix")){
+  if(!dSettings.odoBase && !dEntries.some(e=>e.vehId===curVehId && e.kind!=="fix")){
     alert("먼저 위 '차량 정보'에서 시작 계기판 숫자를 넣고 저장해주세요.\n(지금 계기판에 찍힌 숫자)");
     d_odoBase.focus(); return;
   }
@@ -720,10 +918,25 @@ dAddBtn.onclick=()=>{
     const i=dEntries.findIndex(e=>e.id===dEditingId);
     if(i>-1) dEntries[i]={...dEntries[i],date,dist,note,purpose,...cost};
   }else{
-    dEntries.push({id:uid(),kind:"trip",date,seq:Date.now(),dist,note,purpose,...cost});
+    dEntries.push({id:uid(),vehId:curVehId,kind:"trip",date,seq:Date.now(),dist,note,purpose,...cost});
   }
   dSave(); dStopEdit(); dRenderMonths(); dMonthSelect.value=monthOf(date); dRender();
 };
+function dStartEdit(id){
+  const e=dEntries.find(x=>x.id===id);
+  if(!e || e.kind==="fix") return;
+  dEditingId=id;
+  d_date.value=e.date;
+  d_dist.value=e.dist;
+  d_note.value=e.note||"";
+  d_purpose.value=e.purpose||"출퇴근용";
+  d_fuel.value=e.fuel||""; d_toll.value=e.toll||"";
+  d_park.value=e.park||""; d_etc.value=e.etc||"";
+  dFormTitle.textContent="운행 기록 수정";
+  dAddBtn.textContent="수정 완료";
+  dCancelBtn.style.display="block";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
 function dStopEdit(){
   dEditingId=null; dFormTitle.textContent="운행 입력"; dAddBtn.textContent="추가";
   dCancelBtn.style.display="none";
@@ -775,7 +988,7 @@ function showScreen(m){
                         : m==="drive"   ? "차량 운행기록부"
                         : "티에스코어 업무 기록";
   if(m==="expense"){ renderHeader(); render(); }
-  if(m==="drive"){ dRender(); subLine.textContent = (dSettings.carNo? dSettings.carNo+" · ":"") + "총 "+dEntries.filter(e=>e.kind!=="fix").length+"건 저장됨"; }
+  if(m==="drive"){ dRender(); subLine.textContent = (dSettings.carNo? dSettings.carNo+" · ":"") + "총 "+dEntries.filter(e=>e.vehId===curVehId && e.kind!=="fix").length+"건 저장됨"; }
   if(m==="home"){ subLine.textContent = "무엇을 기록할까요?"; }
   window.scrollTo(0,0);
   try{ localStorage.setItem("gyeongbi_mode", m); }catch(e){}
@@ -792,6 +1005,190 @@ document.querySelectorAll("input.num").forEach(el=>{
     if(el.value!==v) el.value=v;
   });
 });
+
+
+/* ================= 앱 설치 안내 ================= */
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",(e)=>{
+  e.preventDefault(); deferredPrompt=e;
+  installBtn.style.display="block";
+});
+installBtn.onclick=async()=>{
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  try{ await deferredPrompt.userChoice; }catch(e){}
+  deferredPrompt=null; installBtn.style.display="none";
+};
+window.addEventListener("appinstalled",()=>{
+  installBtn.style.display="none"; installHelp.style.display="none";
+});
+(function installGuide(){
+  const standalone = window.matchMedia("(display-mode: standalone)").matches
+                     || window.navigator.standalone === true;
+  if(standalone) return;                       // 이미 앱으로 실행 중
+  const ua = navigator.userAgent;
+  const inApp = /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line/i.test(ua);
+  const isiOS = /iPhone|iPad|iPod/.test(ua);
+  let msg = "";
+  if(inApp){
+    msg = "<b>지금은 카톡(또는 다른 앱) 안에서 열린 상태예요.</b><br>"+
+          "이대로는 설치가 안 됩니다. 화면 오른쪽 아래 메뉴에서 "+
+          "<b>‘다른 브라우저로 열기’</b>를 눌러 "+(isiOS?"사파리":"크롬 또는 삼성 인터넷")+
+          "로 옮긴 뒤 설치해주세요.";
+  }else if(isiOS){
+    msg = "<b>설치 방법</b><br>화면 아래 공유 버튼(⬆️) → <b>‘홈 화면에 추가’</b> → 추가";
+  }else{
+    msg = "<b>설치 방법</b><br>"+
+          "· 크롬 : 오른쪽 위 점 3개 → <b>‘앱 설치’</b> 또는 <b>‘홈 화면에 추가’</b><br>"+
+          "· 삼성 인터넷 : 아래쪽 메뉴(≡) → <b>‘현재 페이지 추가’</b> → <b>‘홈 화면’</b><br>"+
+          "메뉴에 안 보이면 위의 주황색 설치 버튼을 눌러주세요.";
+  }
+  installHelp.innerHTML = msg;
+  installHelp.style.display = "block";
+})();
+
+diagBtn.onclick=()=>{
+  const ua=navigator.userAgent;
+  const f=new File([new Blob(["x"])],"t.xlsx",
+    {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const info=[
+    "기기: "+(/iPhone|iPad/.test(ua)?"아이폰":/Android/.test(ua)?"안드로이드":"기타"),
+    "브라우저: "+(/KAKAOTALK/i.test(ua)?"카톡 내부창(설치·공유 불가)":
+                 /SamsungBrowser/i.test(ua)?"삼성 인터넷":
+                 /CriOS|Chrome/i.test(ua)?"크롬":
+                 /Safari/i.test(ua)?"사파리":"기타"),
+    "앱으로 실행 중: "+((window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true)?"예":"아니오 (브라우저에서 열림)"),
+    "공유 기능: "+(navigator.share?"있음":"없음"),
+    "엑셀 파일 공유 허용: "+(navigator.canShare? (navigator.canShare({files:[f]})?"예":"아니오"):"확인 불가"),
+    "저장 공간 사용 가능: "+(function(){try{localStorage.setItem("_t","1");localStorage.removeItem("_t");return "예";}catch(e){return "아니오";}})(),
+    lastShareError? "최근 공유 오류: "+lastShareError : ""
+  ].filter(Boolean).join("\n");
+  alert(info);
+};
+
+
+/* ================= 로그인 / 동기화 ================= */
+let READONLY = false;
+let signupMode = false;
+
+function localSnapshot(){
+  return {sites, entries, vehicles, dEntries, routes:dRoutes};
+}
+function mergeById(a,b){
+  const m=new Map();
+  (a||[]).forEach(x=>m.set(x.id,x));
+  (b||[]).forEach(x=>{ if(!m.has(x.id)) m.set(x.id,x); });
+  return [...m.values()];
+}
+function applyRemote(d, whoUid){
+  const mine = !SYNC.viewUid;
+  if(mine){
+    sites    = mergeById(d.sites, sites);
+    entries  = mergeById(d.entries, entries);
+    vehicles = mergeById(d.vehicles, vehicles);
+    dEntries = mergeById(d.dEntries, dEntries);
+    dRoutes  = (d.routes && d.routes.length) ? d.routes : dRoutes;
+  }else{
+    sites    = d.sites    || [];
+    entries  = d.entries  || [];
+    vehicles = d.vehicles || [];
+    dEntries = d.dEntries || [];
+    dRoutes  = d.routes   || [];
+  }
+  if(!sites.length)    sites=[{id:uid(),siteName:"",dept:"",cardNumber:"",writer:""}];
+  if(!vehicles.length) vehicles=[{id:uid(),carType:"",carNo:"",dept:"",name:"",odoBase:0}];
+  localStorage.setItem(KEY_E, JSON.stringify(entries));
+  localStorage.setItem(KEY_D, JSON.stringify(dEntries));
+  saveSites(); saveVehicles(); dSaveRoutes();
+  curSiteId = sites.some(x=>x.id===curSiteId)? curSiteId : sites[0].id;
+  curVehId  = vehicles.some(x=>x.id===curVehId)? curVehId : vehicles[0].id;
+  settings=curSite(); dSettings=curVeh();
+  READONLY = !!SYNC.viewUid;
+  roNotice.style.display = READONLY? "block":"none";
+  renderSiteSelect(); renderMonths(); render();
+  renderVehSelect(); fillVehForm(); dRenderMonths(); dRenderRoutes(); dRender();
+}
+function syncPush(){
+  if(window.SYNC && SYNC.user && !SYNC.viewUid) SYNC.push(localSnapshot());
+}
+function refreshLoginBar(){
+  const u = window.SYNC && SYNC.user;
+  if(u){
+    const who = (u.email||"").split("@")[0];
+    loginWho.innerHTML = "<b>"+esc(who)+"</b> 님으로 로그인됨"+
+      (SYNC.isAdmin? " (관리자)":"")+"<br><span style='font-size:11.5px;'>컴퓨터에서도 같은 아이디로 보실 수 있어요</span>";
+    loginBtn.textContent="로그아웃";
+    adminBar.style.display = SYNC.isAdmin? "block":"none";
+    if(SYNC.isAdmin) fillAdminUsers();
+  }else{
+    loginWho.innerHTML = "이 폰에만 저장 중<br><span style='font-size:11.5px;'>로그인하면 컴퓨터에서도 볼 수 있어요</span>";
+    loginBtn.textContent="로그인";
+    adminBar.style.display="none";
+    roNotice.style.display="none";
+    READONLY=false;
+  }
+}
+async function fillAdminUsers(){
+  try{
+    const list = await SYNC.listUsers();
+    adminUserSelect.innerHTML = list.map(u=>
+      '<option value="'+u.uid+'">'+esc(u.name||u.id)+(u.uid===SYNC.user.uid?" (나)":"")+'</option>').join("");
+    adminUserSelect.value = SYNC.user.uid;
+  }catch(e){ adminBar.style.display="none"; }
+}
+adminUserSelect.onchange=()=>{ SYNC.viewUser(adminUserSelect.value); };
+
+loginBtn.onclick=async()=>{
+  if(window.SYNC && SYNC.user){
+    if(!confirm("로그아웃할까요?\n이 폰에 저장된 기록은 그대로 남습니다.")) return;
+    localStorage.removeItem("gyeongbi_hadlogin");
+    await SYNC.logout(); refreshLoginBar();
+    return;
+  }
+  signupMode=false; updateLoginModal();
+  lg_id.value=""; lg_pw.value=""; lg_name.value=""; lgMsg.textContent="";
+  loginModalBg.classList.add("open");
+};
+function updateLoginModal(){
+  loginTitle.textContent = signupMode? "회원가입":"로그인";
+  lgOk.textContent = signupMode? "가입하고 로그인":"로그인";
+  lg_nameWrap.style.display = signupMode? "block":"none";
+  lgSwitch.textContent = signupMode? "이미 계정이 있어요 · 로그인":"계정이 없으신가요? 회원가입";
+}
+lgSwitch.onclick=()=>{ signupMode=!signupMode; lgMsg.textContent=""; updateLoginModal(); };
+lgCancel.onclick=()=>loginModalBg.classList.remove("open");
+lgOk.onclick=async()=>{
+  const id=lg_id.value.trim(), pw=lg_pw.value;
+  if(!id){ lgMsg.textContent="아이디를 입력해주세요."; return; }
+  if(pw.length<6){ lgMsg.textContent="비밀번호는 6자 이상이어야 합니다."; return; }
+  lgOk.disabled=true; lgMsg.textContent="잠시만요…";
+  try{
+    const ok = await SYNC.init();
+    if(!ok) throw new Error("연결 실패");
+    if(signupMode) await SYNC.signup(id, pw, lg_name.value.trim()||id);
+    else           await SYNC.login(id, pw);
+    localStorage.setItem("gyeongbi_hadlogin","1");
+    loginModalBg.classList.remove("open");
+    syncPush();                       // 지금 폰에 있는 기록을 올림
+  }catch(e){
+    const c=(e && e.code)||"";
+    lgMsg.textContent =
+      c.includes("invalid-credential")||c.includes("wrong-password")||c.includes("user-not-found")
+        ? "아이디나 비밀번호가 맞지 않아요."
+      : c.includes("email-already-in-use") ? "이미 있는 아이디예요. 로그인해주세요."
+      : c.includes("weak-password") ? "비밀번호가 너무 쉬워요. 6자 이상으로 해주세요."
+      : c.includes("network") ? "인터넷 연결을 확인해주세요."
+      : "문제가 생겼어요. 잠시 후 다시 시도해주세요.";
+  }
+  lgOk.disabled=false;
+};
+
+if(window.SYNC){
+  SYNC.onState = ()=>{ refreshLoginBar(); };
+  SYNC.onRemote = (d, who)=>{ applyRemote(d, who); refreshLoginBar(); };
+  if(localStorage.getItem("gyeongbi_hadlogin")==="1") SYNC.init();
+}
+refreshLoginBar();
 
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));

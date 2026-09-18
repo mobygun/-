@@ -13,6 +13,18 @@
   function escXml(v){
     return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
+  function setCachedValue(rowXml, ref, value){
+    const re = new RegExp('<c r="'+ref+'"([^>]*?)(\\/>|>([\\s\\S]*?)<\\/c>)');
+    const m = rowXml.match(re);
+    if(!m) return rowXml;
+    let attrs = m[1].replace(/\st="[a-z]+"/g, "");
+    const inner = m[3] || "";
+    const f = inner.match(/<f[\s\S]*?<\/f>|<f[^>]*\/>/);
+    const fx = f ? f[0] : "";
+    const v = (value===""||value===null||value===undefined) ? "" : "<v>"+value+"</v>";
+    return rowXml.slice(0,m.index) + '<c r="'+ref+'"'+attrs+'>'+fx+v+'</c>' + rowXml.slice(m.index+m[0].length);
+  }
+
   function setCell(rowXml, ref, value, numeric){
     const re = new RegExp('<c r="'+ref+'"([^>]*?)(\\/>|>[\\s\\S]*?<\\/c>)');
     const m = rowXml.match(re);
@@ -75,16 +87,19 @@
     }
 
     const lastData = 10+n;
+    let sumCorp=0, sumCash=0;
+    entries.forEach(e=>{ if(e.pay==="법인카드") sumCorp+=Number(e.amount)||0; else sumCash+=Number(e.amount)||0; });
     Object.keys(byNum).map(Number).filter(k=>k>=43).sort((a,b)=>a-b).forEach(i=>{
       let r = shiftRow(byNum[i], delta);
       if(i===43){
         r = r.replace(/<f>SUM\(D11:D\d+\)<\/f>/, "<f>SUM(D11:D"+lastData+")</f>")
-             .replace(/<f>SUM\(E11:E\d+\)<\/f>/, "<f>SUM(E11:E"+lastData+")</f>")
-             .replace(/<v>0<\/v>/g, "");
+             .replace(/<f>SUM\(E11:E\d+\)<\/f>/, "<f>SUM(E11:E"+lastData+")</f>");
+        r = setCachedValue(r, "D"+(43+delta), sumCorp);
+        r = setCachedValue(r, "E"+(43+delta), sumCash);
       }
       if(i===44){
-        r = r.replace(/<f>D\d+\+E\d+<\/f>/, "<f>D"+(43+delta)+"+E"+(43+delta)+"</f>")
-             .replace(/<v>0<\/v>/g, "");
+        r = r.replace(/<f>D\d+\+E\d+<\/f>/, "<f>D"+(43+delta)+"+E"+(43+delta)+"</f>");
+        r = setCachedValue(r, "D"+(44+delta), sumCorp+sumCash);
       }
       out.push(r);
     });
@@ -116,41 +131,50 @@
     for(let i=0;i<buf.length;i++) c = CRCT[(c ^ buf[i]) & 0xFF] ^ (c>>>8);
     return (c ^ 0xFFFFFFFF)>>>0;
   }
-  function zipStore(files){ // files: [{name, bytes}]
-    const enc = new TextEncoder();
-    const chunks = [], central = [];
-    let offset = 0;
-    const now = new Date();
-    const dosTime = ((now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1)) & 0xFFFF;
-    const dosDate = (((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate()) & 0xFFFF;
-    files.forEach(f=>{
-      const nameB = enc.encode(f.name), data = f.bytes, crc = crc32(data);
-      const lh = new Uint8Array(30+nameB.length), dv = new DataView(lh.buffer);
+  async function deflateRaw(bytes){
+    if(typeof CompressionStream==="undefined") return null;
+    try{
+      const cs=new CompressionStream("deflate-raw");
+      const stream=new Blob([bytes]).stream().pipeThrough(cs);
+      const buf=await new Response(stream).arrayBuffer();
+      return new Uint8Array(buf);
+    }catch(e){ return null; }
+  }
+  async function zipStore(files){
+    const enc=new TextEncoder(), chunks=[], central=[]; let offset=0;
+    const now=new Date();
+    const dosTime=((now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1))&0xFFFF;
+    const dosDate=(((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate())&0xFFFF;
+    for(const f of files){
+      const nameB=enc.encode(f.name), raw=f.bytes, crc=crc32(raw);
+      const packed=await deflateRaw(raw);
+      const useDeflate = packed && packed.length < raw.length;
+      const data = useDeflate ? packed : raw;
+      const method = useDeflate ? 8 : 0;
+      const lh=new Uint8Array(30+nameB.length), dv=new DataView(lh.buffer);
       dv.setUint32(0,0x04034b50,true); dv.setUint16(4,20,true); dv.setUint16(6,0x0800,true);
-      dv.setUint16(8,0,true); dv.setUint16(10,dosTime,true); dv.setUint16(12,dosDate,true);
-      dv.setUint32(14,crc,true); dv.setUint32(18,data.length,true); dv.setUint32(22,data.length,true);
+      dv.setUint16(8,method,true); dv.setUint16(10,dosTime,true); dv.setUint16(12,dosDate,true);
+      dv.setUint32(14,crc,true); dv.setUint32(18,data.length,true); dv.setUint32(22,raw.length,true);
       dv.setUint16(26,nameB.length,true); dv.setUint16(28,0,true);
-      lh.set(nameB,30);
-      chunks.push(lh, data);
-      const ch = new Uint8Array(46+nameB.length), cv = new DataView(ch.buffer);
+      lh.set(nameB,30); chunks.push(lh,data);
+      const ch=new Uint8Array(46+nameB.length), cv=new DataView(ch.buffer);
       cv.setUint32(0,0x02014b50,true); cv.setUint16(4,20,true); cv.setUint16(6,20,true);
-      cv.setUint16(8,0x0800,true); cv.setUint16(10,0,true);
+      cv.setUint16(8,0x0800,true); cv.setUint16(10,method,true);
       cv.setUint16(12,dosTime,true); cv.setUint16(14,dosDate,true);
-      cv.setUint32(16,crc,true); cv.setUint32(20,data.length,true); cv.setUint32(24,data.length,true);
+      cv.setUint32(16,crc,true); cv.setUint32(20,data.length,true); cv.setUint32(24,raw.length,true);
       cv.setUint16(28,nameB.length,true); cv.setUint32(42,offset,true);
-      ch.set(nameB,46);
-      central.push(ch);
-      offset += lh.length + data.length;
-    });
-    const cdSize = central.reduce((a,c)=>a+c.length,0);
-    const end = new Uint8Array(22), ev = new DataView(end.buffer);
+      ch.set(nameB,46); central.push(ch);
+      offset+=lh.length+data.length;
+    }
+    const cdSize=central.reduce((a,c)=>a+c.length,0);
+    const end=new Uint8Array(22), ev=new DataView(end.buffer);
     ev.setUint32(0,0x06054b50,true);
     ev.setUint16(8,files.length,true); ev.setUint16(10,files.length,true);
     ev.setUint32(12,cdSize,true); ev.setUint32(16,offset,true);
-    return new Blob([...chunks, ...central, end], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    return new Blob([...chunks, ...central, end],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
   }
 
-  global.buildExpenseXlsx = function(entries, settings, year, monthNum){
+  global.buildExpenseXlsx = async function(entries, settings, year, monthNum){
     const {sheetNew, delta} = buildSheet(entries, settings, year, monthNum);
     let drawing = textOf("xl/drawings/drawing1.xml");
     if(delta) drawing = drawing.replace(/<xdr:row>(\d+)<\/xdr:row>/g,
@@ -177,6 +201,6 @@
       name,
       bytes: overrides[name] ? bytesOfText(overrides[name]) : b64ToBytes(T().files[name])
     }));
-    return zipStore(files);
+    return await zipStore(files);
   };
 })(typeof window!=="undefined" ? window : globalThis);

@@ -1,0 +1,38 @@
+Firebase 보안 규칙 (Firestore)
+================================
+콘솔 → Firestore Database → 규칙(Rules) 탭 →
+아래 내용을 전부 지우고 이걸 붙여넣은 뒤 [게시] 클릭
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 각자 본인 기록만 읽고 쓸 수 있음
+    // 단, 관리자(admins 목록에 있는 계정)는 전 직원 기록을 볼 수 있음
+    match /users/{uid} {
+      allow read: if request.auth != null
+                  && ( request.auth.uid == uid
+                       || exists(/databases/$(database)/documents/admins/$(request.auth.uid)) );
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // 관리자 목록은 읽기만 가능 (추가는 콘솔에서 직접)
+    match /admins/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}
+
+
+관리자 계정 지정하는 법
+========================
+1) 먼저 앱에서 본인 아이디로 회원가입/로그인 한 번 하세요.
+2) 콘솔 → Authentication → Users 탭에서 본인 계정의 '사용자 UID' 를 복사합니다.
+   (영문+숫자 28자리)
+3) 콘솔 → Firestore Database → 데이터 탭 → '컬렉션 시작'
+   - 컬렉션 ID : admins
+   - 문서 ID : 복사한 UID 붙여넣기
+   - 필드 : name / 문자열 / 본인이름  (아무거나 하나 넣으면 됩니다)
+   - 저장
+4) 앱에서 로그아웃 후 다시 로그인하면 관리자로 인식됩니다.
