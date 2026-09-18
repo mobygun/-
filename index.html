@@ -163,6 +163,9 @@
     <div class="who" id="loginWho">이 폰에만 저장 중<br><span style="font-size:11.5px;">로그인하면 컴퓨터에서도 볼 수 있어요</span></div>
     <button id="loginBtn" type="button">로그인</button>
   </div>
+  <div id="deleteAcctWrap" style="display:none;text-align:right;margin:-8px 0 12px;">
+    <button id="deleteAcctBtn" type="button" style="background:none;border:none;color:#B3261E;font-size:12px;text-decoration:underline;padding:4px;">계정 삭제</button>
+  </div>
 
   <div class="adminbar" id="adminBar">
     <select id="adminUserSelect"></select>
@@ -1120,11 +1123,13 @@ function refreshLoginBar(){
     loginBtn.textContent="로그아웃";
     adminBar.style.display = SYNC.isAdmin? "block":"none";
     if(SYNC.isAdmin) fillAdminUsers();
+    deleteAcctWrap.style.display = SYNC.viewUid? "none":"block";
   }else{
     loginWho.innerHTML = "이 폰에만 저장 중<br><span style='font-size:11.5px;'>로그인하면 컴퓨터에서도 볼 수 있어요</span>";
     loginBtn.textContent="로그인";
     adminBar.style.display="none";
     roNotice.style.display="none";
+    deleteAcctWrap.style.display="none";
     READONLY=false;
   }
 }
@@ -1181,6 +1186,30 @@ lgOk.onclick=async()=>{
       : "문제가 생겼어요. 잠시 후 다시 시도해주세요.";
   }
   lgOk.disabled=false;
+};
+
+deleteAcctBtn.onclick=async()=>{
+  if(!window.SYNC || !SYNC.user) return;
+  if(!confirm("정말 계정을 삭제할까요?\n\n이 계정에 저장된 모든 기록이 서버에서 함께 지워지고, 되돌릴 수 없습니다.\n(이 폰에 남아있는 기록은 그대로 남습니다)")) return;
+  const pw = prompt("본인 확인을 위해 비밀번호를 입력해주세요.");
+  if(pw===null) return;
+  if(!pw){ alert("비밀번호를 입력해주세요."); return; }
+  deleteAcctBtn.disabled=true;
+  try{
+    await SYNC.deleteAccount(pw);
+    localStorage.removeItem("gyeongbi_hadlogin");
+    alert("계정이 삭제되었습니다.");
+    refreshLoginBar();
+  }catch(e){
+    const c=(e && e.code)||"";
+    alert(
+      c.includes("wrong-password")||c.includes("invalid-credential") ? "비밀번호가 맞지 않아요."
+      : c.includes("requires-recent-login") ? "보안을 위해 로그아웃 후 다시 로그인한 뒤 시도해주세요."
+      : c.includes("network") ? "인터넷 연결을 확인해주세요."
+      : "계정 삭제에 실패했어요. 잠시 후 다시 시도해주세요."
+    );
+  }
+  deleteAcctBtn.disabled=false;
 };
 
 if(window.SYNC){

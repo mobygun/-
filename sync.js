@@ -106,6 +106,15 @@
     }, 800);
   };
 
+  // 본인 계정 탈퇴 (본인 것만 가능)
+  S.deleteAccount = async function(pw){
+    if(!S.user) throw new Error("로그인이 필요합니다.");
+    const cred = firebase.auth.EmailAuthProvider.credential(S.user.email, pw);
+    await S.user.reauthenticateWithCredential(cred);
+    try{ await S.db.collection("users").doc(S.user.uid).delete(); }catch(e){}
+    await S.user.delete();
+  };
+
   // 어드민: 전체 사용자 목록
   S.listUsers = async function(){
     const snap = await S.db.collection("users").get();
