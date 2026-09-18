@@ -393,6 +393,8 @@
       <button class="btn btn-ghost" id="weeklyShareBtn" type="button">공유하기</button>
       <button class="btn btn-primary" id="weeklyExportBtn" type="button">엑셀 저장</button>
     </div>
+    <div class="small" style="margin:10px 0 6px;">지금 보고 있는 이 주차만 저장돼요. 지금까지 쓴 모든 주차를 한 파일에 모으려면:</div>
+    <button class="btn btn-ghost" id="weeklyExportAllBtn" type="button">전체 주차 모아서 저장</button>
   </div>
 
   <div class="hint">로그인한 팀원이면 누구나 아무 칸이나 적고 고칠 수 있어요. 저장은 자동으로 됩니다.</div>
@@ -735,6 +737,23 @@ exportBtn.onclick=()=>{ if((MODE==="drive"?dCurList():curList()).length===0){ale
 shareBtn.onclick=()=>{ if((MODE==="drive"?dCurList():curList()).length===0){alert("이 달에 입력된 기록이 없어요.");return;} openModal("share"); };
 weeklyExportBtn.onclick=()=>{ if(!W || !W.members || !W.members.length){alert("등록된 팀원이 없어요. 먼저 이름을 추가해주세요.");return;} openModal("download"); };
 weeklyShareBtn.onclick=()=>{ if(!W || !W.members || !W.members.length){alert("등록된 팀원이 없어요. 먼저 이름을 추가해주세요.");return;} openModal("share"); };
+weeklyExportAllBtn.onclick=async()=>{
+  if(!window.SYNC || !SYNC.user) return;
+  weeklyExportAllBtn.disabled=true;
+  const orig=weeklyExportAllBtn.textContent;
+  weeklyExportAllBtn.textContent="만드는 중… (시간이 좀 걸려요)";
+  try{
+    const list = await SYNC.listWeeks();
+    if(!list.length){ alert("아직 저장된 주차가 없어요."); return; }
+    list.sort((a,b)=> a.weekStart<b.weekStart?-1:a.weekStart>b.weekStart?1:0);
+    const blob = await window.buildAllWeeklyXlsx(list);
+    dl(blob, "인프라구축팀_주간업무일지_전체.xlsx");
+  }catch(e){
+    alert("엑셀을 만들지 못했어요. 잠시 후 다시 시도해주세요.");
+  }
+  weeklyExportAllBtn.textContent=orig;
+  weeklyExportAllBtn.disabled=false;
+};
 
 
 /* ================= 차량 운행기록부 ================= */

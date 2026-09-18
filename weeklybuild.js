@@ -157,4 +157,91 @@
     }));
     return await zipStore(files);
   };
+
+  // 여러 주차를 한 파일에 시트별로 쌓아서 저장 (과거 이관분 + 지금까지 쓴 것 전부)
+  // weekDocs: weekStart 오름차순 정렬된 주차 문서 배열
+  global.buildAllWeeklyXlsx = async function(weekDocs){
+    const n = weekDocs.length;
+    const baseSheet = textOf("xl/worksheets/sheet24.xml");
+    const baseSheetRels = textOf("xl/worksheets/_rels/sheet24.xml.rels");
+    const baseDrawing = textOf("xl/drawings/drawing24.xml");
+    const baseDrawingRels = textOf("xl/drawings/_rels/drawing24.xml.rels");
+
+    const files = [
+      {name:"_rels/.rels", bytes:b64ToBytes(T().files["_rels/.rels"])},
+      {name:"xl/theme/theme1.xml", bytes:b64ToBytes(T().files["xl/theme/theme1.xml"])},
+      {name:"xl/styles.xml", bytes:b64ToBytes(T().files["xl/styles.xml"])},
+      {name:"xl/sharedStrings.xml", bytes:b64ToBytes(T().files["xl/sharedStrings.xml"])},
+      {name:"xl/media/image1.png", bytes:b64ToBytes(T().files["xl/media/image1.png"])},
+      {name:"xl/printerSettings/printerSettings24.bin", bytes:b64ToBytes(T().files["xl/printerSettings/printerSettings24.bin"])},
+      {name:"docProps/core.xml", bytes:b64ToBytes(T().files["docProps/core.xml"])}
+    ];
+
+    const sheetTags = [], definedNames = [], ctOverrides = [], relEntries = [];
+    for(let i=0;i<n;i++){
+      const idx = i+1;
+      const wd = weekDocs[i];
+      const label = wd.label || wd.weekId || ("주차"+idx);
+      const labelEsc = escXml(label);
+
+      const sheetXml = buildSheet(wd);
+      files.push({name:"xl/worksheets/sheet"+idx+".xml", bytes:bytesOfText(sheetXml)});
+
+      const sheetRelsXml = baseSheetRels.replace(/drawing24\.xml/, "drawing"+idx+".xml");
+      files.push({name:"xl/worksheets/_rels/sheet"+idx+".xml.rels", bytes:bytesOfText(sheetRelsXml)});
+
+      files.push({name:"xl/drawings/drawing"+idx+".xml", bytes:bytesOfText(baseDrawing)});
+      files.push({name:"xl/drawings/_rels/drawing"+idx+".xml.rels", bytes:bytesOfText(baseDrawingRels)});
+
+      sheetTags.push('<sheet name="'+labelEsc+'" sheetId="'+idx+'" r:id="rIdS'+idx+'"/>');
+      definedNames.push('<definedName name="_xlnm.Print_Area" localSheetId="'+i+'">\''+labelEsc+'\'!$A$1:$Q$20</definedName>');
+      ctOverrides.push('<Override PartName="/xl/worksheets/sheet'+idx+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>');
+      ctOverrides.push('<Override PartName="/xl/drawings/drawing'+idx+'.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>');
+      relEntries.push('<Relationship Id="rIdS'+idx+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+idx+'.xml"/>');
+    }
+
+    const wbXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'+
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+      '<sheets>'+sheetTags.join("")+'</sheets>'+
+      '<definedNames>'+definedNames.join("")+'</definedNames>'+
+      '</workbook>';
+    files.push({name:"xl/workbook.xml", bytes:bytesOfText(wbXml)});
+
+    const wbRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'+
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+      relEntries.join("")+
+      '<Relationship Id="rIdTheme" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>'+
+      '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'+
+      '<Relationship Id="rIdStrings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>'+
+      '</Relationships>';
+    files.push({name:"xl/_rels/workbook.xml.rels", bytes:bytesOfText(wbRelsXml)});
+
+    const appXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'+
+      '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'+
+      '<Application>Microsoft Excel</Application>'+
+      '<HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>'+n+'</vt:i4></vt:variant></vt:vector></HeadingPairs>'+
+      '<TitlesOfParts><vt:vector size="'+n+'" baseType="lpstr">'+
+      weekDocs.map(wd=>'<vt:lpstr>'+escXml(wd.label||wd.weekId)+'</vt:lpstr>').join("")+
+      '</vt:vector></TitlesOfParts>'+
+      '</Properties>';
+    files.push({name:"docProps/app.xml", bytes:bytesOfText(appXml)});
+
+    const ctXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'+
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+      '<Default Extension="xml" ContentType="application/xml"/>'+
+      '<Default Extension="png" ContentType="image/png"/>'+
+      '<Default Extension="bin" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings"/>'+
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+
+      ctOverrides.join("")+
+      '<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>'+
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+
+      '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>'+
+      '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'+
+      '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'+
+      '</Types>';
+    files.push({name:"[Content_Types].xml", bytes:bytesOfText(ctXml)});
+
+    return await zipStore(files);
+  };
 })(typeof window!=="undefined" ? window : globalThis);
