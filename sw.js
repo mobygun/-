@@ -1,5 +1,5 @@
-const CACHE = "gyeongbi-v25";
-const ASSETS = ["./", "./index.html", "./manifest.json", "./template.js", "./xlsxbuild.js", "./template2.js", "./drivebuild.js", "./sync.js", "./icon-192.png", "./icon-512.png"];
+const CACHE = "gyeongbi-v26";
+const ASSETS = ["./", "./index.html", "./manifest.json", "./template.js", "./xlsxbuild.js", "./template2.js", "./drivebuild.js", "./template3.js", "./weeklybuild.js", "./weeklylog_seed.js", "./sync.js", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

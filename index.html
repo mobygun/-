@@ -14,6 +14,9 @@
 <script src="./xlsxbuild.js"></script>
 <script src="./template2.js"></script>
 <script src="./drivebuild.js"></script>
+<script src="./template3.js"></script>
+<script src="./weeklybuild.js"></script>
+<script src="./weeklylog_seed.js"></script>
 <script src="./sync.js"></script>
 <style>
   :root{
@@ -140,6 +143,9 @@
   .entry.adj .tag{background:var(--danger);}
   .odo button{background:none;border:1px solid var(--line);border-radius:7px;padding:5px 9px;
     font-size:12px;color:var(--muted);font-family:inherit;}
+  .wtextarea{width:100%;padding:11px 10px;border:1px solid var(--line);border-radius:8px;
+    font-size:15px;background:#FBFAF6;color:var(--ink);font-family:inherit;resize:vertical;}
+  .wmember-name{background:#F4F1E8;}
 </style>
 </head>
 <body>
@@ -178,6 +184,10 @@
   <button class="home-btn" id="goDrive" type="button">
     <div class="t">차량 운행기록부</div>
     <div class="d">업무용 차량 운행거리 기록</div>
+  </button>
+  <button class="home-btn" id="goWeekly" type="button">
+    <div class="t">주간업무일지</div>
+    <div class="d">팀 전체가 같이 보고 적는 한 주 업무 기록</div>
   </button>
 </div>
 
@@ -337,6 +347,55 @@
   </div>
 
   <div class="hint">계기판 숫자를 몰라도 됩니다. 거리만 넣으면 앱이 이어서 계산해요.<br>가끔 실제 계기판을 봤을 때 <b>보정</b>만 눌러주세요.</div>
+</div>
+
+<div class="wrap" id="screenWeekly" style="display:none;">
+
+  <div class="profbar">
+    <select id="weekSelect"></select>
+  </div>
+
+  <div class="card">
+    <h2>기본 정보</h2>
+    <div class="field"><label>주차 이름 (달력상 몇 주차인지는 회사 기준과 다를 수 있어 직접 고칠 수 있어요)</label>
+      <input type="text" id="w_label" placeholder="예: 2026년 09월 3주차"></div>
+    <div class="row2">
+      <div class="field"><label>소속</label><input type="text" id="w_dept" placeholder="예: 인프라공사부"></div>
+      <div class="field"><label>보고자</label><input type="text" id="w_reporter" placeholder="예: 홍길동"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>팀원 (로그인한 사람이면 누구나 추가·삭제할 수 있어요)</h2>
+    <div class="routes" id="memberList"></div>
+  </div>
+
+  <div class="card">
+    <h2>자주 쓰는 현장명 (입력칸을 먼저 누른 다음, 아래 버튼을 누르면 커서 위치에 들어가요)</h2>
+    <div class="routes" id="weeklySiteList"></div>
+  </div>
+
+  <div id="weeklyDays"></div>
+
+  <div class="card">
+    <h2>차주 예정사항</h2>
+    <textarea class="wtextarea" id="w_nextPlan" rows="4"></textarea>
+  </div>
+
+  <div class="card" id="weeklyImportWrap" style="display:none;">
+    <h2>관리자 전용</h2>
+    <button class="btn btn-ghost" id="weeklyImportBtn" type="button">(1회) 과거 24주 데이터 가져오기</button>
+    <div class="small">2026년 4월 3주차 ~ 9월 3주차 기록을 한 번만 불러옵니다. 이미 가져온 주차는 다시 눌러도 덮어쓰지 않아요.</div>
+  </div>
+
+  <div class="card" style="padding:6px 12px 12px;">
+    <div class="editbar">
+      <button class="btn btn-ghost" id="weeklyShareBtn" type="button">공유하기</button>
+      <button class="btn btn-primary" id="weeklyExportBtn" type="button">엑셀 저장</button>
+    </div>
+  </div>
+
+  <div class="hint">로그인한 팀원이면 누구나 아무 칸이나 적고 고칠 수 있어요. 저장은 자동으로 됩니다.</div>
 </div>
 
 <div class="actionbar">
@@ -615,6 +674,9 @@ function defaultName(){
     const [dy,dmo]=dMonthSelect.value.split("-");
     return dy+"_"+Number(dmo)+"월_차량운행기록부_"+(dSettings.name||"본인이름");
   }
+  if(MODE==="weekly"){
+    return (W?W.label:"주간업무일지").replace(/\s+/g,"_")+"_주간업무일지";
+  }
   const [y,mo]=monthSelect.value.split("-");
   return y+"_"+Number(mo)+"월_경비_"+(settings.writer||"본인이름");
 }
@@ -628,13 +690,17 @@ modalCancel.onclick=()=>nameModalBg.classList.remove("open");
 modalOk.onclick=async()=>{
   const name=(fileNameInput.value.trim()||defaultName())+".xlsx";
   nameModalBg.classList.remove("open");
-  const sel = (MODE==="drive"? dMonthSelect : monthSelect).value;
-  const [y,mo]=sel.split("-");
   let blob;
   try{
-    blob = MODE==="drive"
-      ? await window.buildDriveXlsx(dDaysForExport(), dSettings, y, Number(mo))
-      : await window.buildExpenseXlsx(curList(), settings, y, Number(mo));
+    if(MODE==="weekly"){
+      blob = await window.buildWeeklyXlsx(W);
+    }else{
+      const sel = (MODE==="drive"? dMonthSelect : monthSelect).value;
+      const [y,mo]=sel.split("-");
+      blob = MODE==="drive"
+        ? await window.buildDriveXlsx(dDaysForExport(), dSettings, y, Number(mo))
+        : await window.buildExpenseXlsx(curList(), settings, y, Number(mo));
+    }
   }catch(err){
     alert("엑셀을 만들지 못했어요. 앱을 완전히 껐다가 다시 열어주세요.");
     return;
@@ -667,6 +733,8 @@ modalOk.onclick=async()=>{
 };
 exportBtn.onclick=()=>{ if((MODE==="drive"?dCurList():curList()).length===0){alert("이 달에 입력된 기록이 없어요.");return;} openModal("download"); };
 shareBtn.onclick=()=>{ if((MODE==="drive"?dCurList():curList()).length===0){alert("이 달에 입력된 기록이 없어요.");return;} openModal("share"); };
+weeklyExportBtn.onclick=()=>{ if(!W || !W.members || !W.members.length){alert("등록된 팀원이 없어요. 먼저 이름을 추가해주세요.");return;} openModal("download"); };
+weeklyShareBtn.onclick=()=>{ if(!W || !W.members || !W.members.length){alert("등록된 팀원이 없어요. 먼저 이름을 추가해주세요.");return;} openModal("share"); };
 
 
 /* ================= 차량 운행기록부 ================= */
@@ -975,6 +1043,242 @@ function dDaysForExport(){
 }
 
 
+/* ================= 주간업무일지 ================= */
+const KEY_WSITES = "gyeongbi_weekly_sites";
+let wSites = [];
+try{ wSites = JSON.parse(localStorage.getItem(KEY_WSITES)||"[]"); }catch(e){ wSites=[]; }
+function wSaveSites(){ localStorage.setItem(KEY_WSITES, JSON.stringify(wSites)); }
+
+let W = null;          // 지금 화면에 열려있는 주(week) 문서
+let weekList = [];      // SYNC.listWeeks() 결과 캐시
+let wLastFocused = null;
+const W_DOW = ["일","월","화","수","목","금","토"];
+
+function wPad2(n){ return String(n).padStart(2,"0"); }
+function wFmtDate(d){ return d.getFullYear()+"-"+wPad2(d.getMonth()+1)+"-"+wPad2(d.getDate()); }
+function wAddDays(d, n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function wMondayOf(d){
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = x.getDay();
+  return wAddDays(x, day===0 ? -6 : 1-day);
+}
+function wLabelOf(monday){
+  const wom = Math.ceil(monday.getDate()/7);
+  return monday.getFullYear()+"년 "+wPad2(monday.getMonth()+1)+"월 "+wom+"주차";
+}
+function wNewWeekDoc(weekId){
+  const monday = new Date(weekId+"T00:00:00");
+  const days=[];
+  for(let i=0;i<6;i++){ const d=wAddDays(monday,i); days.push({date:wFmtDate(d), dow:W_DOW[d.getDay()]}); }
+  const prev = weekList[0];
+  return {
+    weekId, weekStart: weekId, weekEnd: wFmtDate(wAddDays(monday,5)),
+    label: wLabelOf(monday), days,
+    members: prev ? (prev.members||[]).slice() : [],
+    entries: {}, remarks:["","","","","",""],
+    nextWeekPlan:"", dept:"인프라공사부", reporter:""
+  };
+}
+
+async function wLoadWeekList(){
+  try{ weekList = await SYNC.listWeeks(); }catch(e){ weekList = []; }
+}
+
+function wPopulateWeekSelect(selectedId){
+  const map = {};
+  weekList.forEach(w=>{ map[w.weekId] = w.label; });
+  const todayId = wFmtDate(wMondayOf(new Date()));
+  if(!map[todayId]) map[todayId] = "이번 주";
+  if(W && W.weekId===selectedId) map[selectedId] = W.label;
+  const ids = Object.keys(map).sort().reverse();
+  weekSelect.innerHTML = ids.map(id=>
+    '<option value="'+id+'"'+(id===selectedId?' selected':'')+'>'+esc(map[id])+'</option>'
+  ).join("");
+}
+
+async function wOpenWeek(weekId){
+  if(window.SYNC) SYNC.stopWeekly();
+  const existing = weekList.find(w=>w.weekId===weekId);
+  // 화면을 열어보기만 해서는 문서를 만들지 않음(과거 이관 데이터와 주차가 겹칠 때
+  // 빈 문서가 먼저 생겨 이관을 막아버리는 문제 방지). 실제로 뭔가 입력할 때 wPush()에서 만들어짐.
+  W = existing ? Object.assign({}, existing) : wNewWeekDoc(weekId);
+  wRenderAll();
+  if(window.SYNC) SYNC.watchWeekly(weekId);
+}
+
+function wPush(){
+  if(!W || !window.SYNC) return;
+  const {weekId, ...rest} = W;
+  SYNC.pushWeekly(weekId, rest);
+}
+
+function wRenderAll(){
+  if(!W) return;
+  wPopulateWeekSelect(W.weekId);
+  w_label.value = W.label||"";
+  w_dept.value = W.dept||"";
+  w_reporter.value = W.reporter||"";
+  w_nextPlan.value = W.nextWeekPlan||"";
+  wRenderMembers();
+  wRenderSiteChips();
+  wRenderDays();
+}
+
+function wRenderMembers(){
+  memberList.innerHTML = (W.members||[]).map((name,i)=>
+    '<span class="route-wrap">'+
+      '<span class="route wmember-name">'+esc(name)+'</span>'+
+      '<button class="route-x" data-mdel="'+i+'" type="button">×</button>'+
+    '</span>'
+  ).join("") + '<button class="route add" id="memberAdd" type="button">+ 이름 추가</button>';
+
+  memberList.querySelectorAll("[data-mdel]").forEach(b=>{
+    b.onclick=()=>{
+      const i=+b.dataset.mdel, nm=W.members[i];
+      if(!confirm('"'+nm+'" 이름을 이번 주 명단에서 뺄까요?\n(그동안 적은 내용은 남아있고, 다시 이름을 추가하면 이어서 보여요)')) return;
+      W.members.splice(i,1);
+      wPush(); wRenderAll();
+    };
+  });
+  document.getElementById("memberAdd").onclick=()=>{
+    const name = prompt("이름"); if(!name || !name.trim()) return;
+    const nm = name.trim();
+    if(!W.members.includes(nm)) W.members.push(nm);
+    if(!W.entries[nm]) W.entries[nm] = W.days.map(()=>"");
+    wPush(); wRenderAll();
+  };
+}
+
+function wRenderSiteChips(){
+  weeklySiteList.innerHTML = wSites.map((s,i)=>
+    '<span class="route-wrap">'+
+      '<button class="route" data-si="'+i+'" type="button">'+esc(s.name)+'</button>'+
+      '<button class="route-x" data-sdel="'+i+'" type="button">×</button>'+
+    '</span>'
+  ).join("") + '<button class="route add" id="weeklySiteAdd" type="button">+ 현장명 등록</button>';
+
+  weeklySiteList.querySelectorAll("[data-si]").forEach(b=>{
+    // 버튼을 눌러도 입력칸(textarea)의 포커스/커서 위치가 유지되도록,
+    // 클릭이 완료되기 전 단계(mousedown)에서 포커스 이동 자체를 막는다.
+    b.onmousedown=(e)=>{ e.preventDefault(); };
+    b.onclick=()=>{
+      const s = wSites[+b.dataset.si];
+      const ta = wLastFocused;
+      if(!ta || !ta.classList || !ta.classList.contains("w_entry")){
+        alert("먼저 내용을 적을 칸을 눌러 커서를 놓은 다음 눌러주세요.");
+        return;
+      }
+      const start = ta.selectionStart||0, end = ta.selectionEnd||0, v = ta.value;
+      ta.value = v.slice(0,start) + s.name + v.slice(end);
+      const pos = start + s.name.length;
+      ta.focus(); ta.selectionStart = ta.selectionEnd = pos;
+      ta.dispatchEvent(new Event("input"));
+    };
+  });
+  weeklySiteList.querySelectorAll("[data-sdel]").forEach(b=>{
+    b.onclick=()=>{
+      const i=+b.dataset.sdel;
+      if(!confirm('"'+wSites[i].name+'" 를 지울까요?')) return;
+      wSites.splice(i,1); wSaveSites(); wRenderSiteChips();
+    };
+  });
+  document.getElementById("weeklySiteAdd").onclick=()=>{
+    const name = prompt("자주 쓰는 현장명"); if(!name || !name.trim()) return;
+    wSites.push({name:name.trim()}); wSaveSites(); wRenderSiteChips();
+  };
+}
+
+function wRenderDays(){
+  weeklyDays.innerHTML = "";
+  (W.days||[]).forEach((day,di)=>{
+    const box = document.createElement("div");
+    box.className = "card";
+    const mm = +day.date.slice(5,7), dd = +day.date.slice(8,10);
+    let html = '<h2>'+mm+'월 '+dd+'일 ('+esc(day.dow)+')</h2>';
+    (W.members||[]).forEach(name=>{
+      const val = (W.entries[name]||[])[di] || "";
+      html += '<div class="field"><label>'+esc(name)+'</label>'+
+        '<textarea class="wtextarea w_entry" data-day="'+di+'" data-name="'+esc(name)+'" rows="3">'+esc(val)+'</textarea></div>';
+    });
+    if(!W.members || !W.members.length){
+      html += '<div class="small">아직 등록된 팀원이 없어요. 위 "팀원" 칸에서 이름을 추가해주세요.</div>';
+    }
+    html += '<div class="field"><label>비고</label><input type="text" class="w_remark" data-day="'+di+'" value="'+esc((W.remarks||[])[di]||"")+'"></div>';
+    box.innerHTML = html;
+    weeklyDays.appendChild(box);
+  });
+
+  weeklyDays.querySelectorAll(".w_entry").forEach(ta=>{
+    ta.addEventListener("focus", ()=>{ wLastFocused = ta; });
+    ta.addEventListener("input", ()=>{
+      const di=+ta.dataset.day, name=ta.dataset.name;
+      if(!W.entries[name]) W.entries[name] = W.days.map(()=>"");
+      W.entries[name][di] = ta.value;
+      wPush();
+    });
+  });
+  weeklyDays.querySelectorAll(".w_remark").forEach(inp=>{
+    inp.addEventListener("focus", ()=>{ wLastFocused = inp; });
+    inp.addEventListener("input", ()=>{
+      W.remarks[+inp.dataset.day] = inp.value;
+      wPush();
+    });
+  });
+}
+
+weekSelect.onchange = ()=>{ wOpenWeek(weekSelect.value); };
+[w_label,w_dept,w_reporter,w_nextPlan].forEach(el=>{
+  el.addEventListener("focus", ()=>{ wLastFocused = el; });
+  el.addEventListener("input", ()=>{
+    W.label = w_label.value; W.dept = w_dept.value; W.reporter = w_reporter.value; W.nextWeekPlan = w_nextPlan.value;
+    wPush();
+  });
+});
+
+async function wEnter(){
+  weeklyDays.innerHTML = '<div class="small" style="padding:20px 4px;text-align:center;">불러오는 중…</div>';
+  await wLoadWeekList();
+  const startId = (W && W.weekId) || wFmtDate(wMondayOf(new Date()));
+  await wOpenWeek(startId);
+  weeklyImportWrap.style.display = (window.SYNC && SYNC.isAdmin) ? "block":"none";
+}
+
+weeklyImportBtn.onclick = async ()=>{
+  if(!window.WEEKLY_SEED || !window.SYNC || !SYNC.user) return;
+  if(!confirm("과거 24주 데이터를 가져올까요?\n이미 있는 주차는 건드리지 않아요.")) return;
+  weeklyImportBtn.disabled = true;
+  try{
+    await wLoadWeekList();
+    const have = new Set(weekList.map(w=>w.weekId));
+    let n=0;
+    for(const w of window.WEEKLY_SEED){
+      if(have.has(w.weekId)) continue;
+      const {weekId, ...rest} = w;
+      await SYNC.db.collection("weeklyLogs").doc(weekId).set(
+        Object.assign({updatedAt:Date.now(), updatedBy:SYNC.user.uid}, rest), {merge:true});
+      n++;
+    }
+    await wLoadWeekList();
+    wPopulateWeekSelect(W ? W.weekId : "");
+    alert(n+"개 주차를 새로 가져왔어요. (이미 있던 주차는 건너뜀)");
+  }catch(e){
+    alert("가져오는 중 문제가 생겼어요. 인터넷 연결을 확인하고 다시 시도해주세요.");
+  }
+  weeklyImportBtn.disabled = false;
+};
+
+if(window.SYNC){
+  SYNC.onWeeklyRemote = (data, weekId)=>{
+    if(!W || W.weekId!==weekId || !data) return;
+    const active = document.activeElement;
+    const typing = active && active.classList && (active.classList.contains("w_entry")||active.classList.contains("w_remark"));
+    W = Object.assign({weekId}, data);
+    const idx = weekList.findIndex(x=>x.weekId===weekId);
+    if(idx>=0) weekList[idx]=W; else weekList.unshift(W);
+    if(!typing && MODE==="weekly") wRenderAll();
+  };
+}
+
 
 /* ================= 화면 전환 ================= */
 let MODE = "home";
@@ -983,21 +1287,35 @@ function showScreen(m){
   screenHome.style.display  = m==="home"    ? "block":"none";
   screenExpense.style.display = m==="expense" ? "block":"none";
   screenDrive.style.display = m==="drive"   ? "block":"none";
-  document.querySelector(".actionbar").style.display = m==="home" ? "none":"block";
+  screenWeekly.style.display = m==="weekly"  ? "block":"none";
+  document.querySelector(".actionbar").style.display = (m==="home"||m==="weekly") ? "none":"block";
   homeLink.style.display = m==="home" ? "none":"block";
-  backupBtn.style.display = m==="home" ? "none":"block";
+  backupBtn.style.display = (m==="home"||m==="weekly") ? "none":"block";
   backupPanel.classList.remove("open");
   titleLine.textContent = m==="expense" ? "현장 경비 지출대장"
                         : m==="drive"   ? "차량 운행기록부"
+                        : m==="weekly"  ? "주간업무일지"
                         : "티에스코어 업무 기록";
   if(m==="expense"){ renderHeader(); render(); }
   if(m==="drive"){ dRender(); subLine.textContent = (dSettings.carNo? dSettings.carNo+" · ":"") + "총 "+dEntries.filter(e=>e.vehId===curVehId && e.kind!=="fix").length+"건 저장됨"; }
+  if(m==="weekly"){ subLine.textContent = "팀 전체가 같이 보고 적어요"; }
   if(m==="home"){ subLine.textContent = "무엇을 기록할까요?"; }
   window.scrollTo(0,0);
   try{ localStorage.setItem("gyeongbi_mode", m); }catch(e){}
 }
 goExpense.onclick=()=>showScreen("expense");
 goDrive.onclick=()=>showScreen("drive");
+goWeekly.onclick=async()=>{
+  if(!window.SYNC || !SYNC.user){
+    alert("주간업무일지는 팀 전체가 같이 보는 공용 기록이라 로그인이 필요해요.");
+    signupMode=false; updateLoginModal();
+    lg_id.value=""; lg_pw.value=""; lg_name.value=""; lgMsg.textContent="";
+    loginModalBg.classList.add("open");
+    return;
+  }
+  showScreen("weekly");
+  await wEnter();
+};
 homeLink.onclick=()=>showScreen("home");
 
 // 숫자 칸에는 숫자만 들어가게 (문자 입력 차단)

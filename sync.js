@@ -115,6 +115,36 @@
     await S.user.delete();
   };
 
+  // 주간업무일지: 공용 문서 실시간 감시
+  let weeklyUnsub=null;
+  S.watchWeekly = function(weekId){
+    if(weeklyUnsub){ weeklyUnsub(); weeklyUnsub=null; }
+    weeklyUnsub = S.db.collection("weeklyLogs").doc(weekId).onSnapshot((doc)=>{
+      if(S.onWeeklyRemote) S.onWeeklyRemote(doc.exists ? doc.data() : null, weekId);
+    }, (err)=>console.error(err));
+  };
+  S.stopWeekly = function(){ if(weeklyUnsub){ weeklyUnsub(); weeklyUnsub=null; } };
+
+  // 주간업무일지: 공용 문서 저장 (로그인한 사람이면 누구나 전체 문서를 씀)
+  let weeklyTimer=null, weeklyPending=null, weeklyPendingId=null;
+  S.pushWeekly = function(weekId, data){
+    if(!S.user) return;
+    weeklyPendingId = weekId; weeklyPending = data;
+    clearTimeout(weeklyTimer);
+    weeklyTimer = setTimeout(async ()=>{
+      try{
+        await S.db.collection("weeklyLogs").doc(weeklyPendingId).set(
+          Object.assign({updatedAt:Date.now(), updatedBy:S.user.uid}, weeklyPending), {merge:true});
+      }catch(e){ console.error(e); }
+    }, 800);
+  };
+
+  // 주간업무일지: 주차 목록 (weekId 내림차순)
+  S.listWeeks = async function(){
+    const snap = await S.db.collection("weeklyLogs").orderBy("weekStart","desc").get();
+    return snap.docs.map(d=>({weekId:d.id, ...d.data()}));
+  };
+
   // 어드민: 전체 사용자 목록
   S.listUsers = async function(){
     const snap = await S.db.collection("users").get();
