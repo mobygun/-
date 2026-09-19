@@ -83,26 +83,35 @@
   };
 
   // 서버 데이터 실시간 감시
+  S.firstRemote = true;   // 로그인 직후 첫 수신 여부 (이 폰에 있던 기록과 합칠 때만 씀)
   S.watch = function(uid){
     if(S.unsub){ S.unsub(); S.unsub=null; }
+    S.firstRemote = true;
     S.unsub = S.db.collection("users").doc(uid).onSnapshot((doc)=>{
       if(!doc.exists) return;
+      // 내가 방금 올린 내용이 되돌아온 것(아직 서버 확인 전)이거나, 아직 안 올린 수정이 있으면 무시
+      // (이걸 안 하면 입력 중인 내용이 서버의 옛 내용으로 덮어써짐)
+      if(doc.metadata.hasPendingWrites) return;
+      if(S.isDirty()) return;
       const d=doc.data();
       if(S.onRemote) S.onRemote(d, uid);
     }, (err)=>console.error(err));
   };
 
   // 앱 데이터 업로드
-  let timer=null, pending=null;
+  let timer=null, pending=null, inflight=false;
+  S.isDirty = function(){ return !!timer || inflight; };
   S.push = function(data){
     if(!S.user || S.viewUid) return;           // 로그아웃 상태거나 남의 기록 보는 중이면 저장 안 함
     pending=data;
     clearTimeout(timer);
     timer=setTimeout(async ()=>{
+      timer=null; inflight=true;
       try{
         await S.db.collection("users").doc(S.user.uid).set(
           Object.assign({updatedAt:Date.now()}, pending), {merge:true});
       }catch(e){ console.error(e); }
+      inflight=false;
     }, 800);
   };
 
@@ -120,6 +129,8 @@
   S.watchWeekly = function(weekId){
     if(weeklyUnsub){ weeklyUnsub(); weeklyUnsub=null; }
     weeklyUnsub = S.db.collection("weeklyLogs").doc(weekId).onSnapshot((doc)=>{
+      // 내가 방금 올린 내용이 되돌아온 것이거나, 아직 안 올린 수정이 있으면 무시 (입력 중 덮어쓰기 방지)
+      if(doc.metadata.hasPendingWrites || weeklyTimer) return;
       if(S.onWeeklyRemote) S.onWeeklyRemote(doc.exists ? doc.data() : null, weekId);
     }, (err)=>console.error(err));
   };
@@ -132,9 +143,11 @@
     weeklyPendingId = weekId; weeklyPending = data;
     clearTimeout(weeklyTimer);
     weeklyTimer = setTimeout(async ()=>{
+      weeklyTimer = null;
       try{
         await S.db.collection("weeklyLogs").doc(weeklyPendingId).set(
-          Object.assign({updatedAt:Date.now(), updatedBy:S.user.uid}, weeklyPending), {merge:true});
+          Object.assign({}, weeklyPending, {updatedAt:Date.now(), updatedBy:S.user.uid,
+            updatedByName:(S.user.email||"").split("@")[0]}), {merge:true});
       }catch(e){ console.error(e); }
     }, 800);
   };

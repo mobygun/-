@@ -1,8 +1,8 @@
 {
   "id": "/gyeongbi-app/",
-  "name": "티에스코어 업무 기록",
-  "short_name": "업무기록",
-  "description": "현장 경비 지출대장과 차량 운행기록부를 폰에서 바로 적고 엑셀로 뽑는 앱",
+  "name": "티에스코어 작성 앱",
+  "short_name": "티에스코어 작성 앱",
+  "description": "현장 경비 지출대장·차량 운행기록부·주간업무일지를 폰에서 바로 적고 엑셀로 뽑는 앱",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

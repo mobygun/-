@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#20221B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="경비대장">
+<meta name="apple-mobile-web-app-title" content="티에스코어 작성 앱">
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-192.png">
-<title>현장 경비 지출대장</title>
+<title>티에스코어 작성 앱</title>
 <script src="./template.js"></script>
 <script src="./xlsxbuild.js"></script>
 <script src="./template2.js"></script>
@@ -154,7 +154,7 @@
   <div class="inner">
     <div>
       <button class="backlink" id="homeLink" type="button" style="display:none;">‹ 처음으로</button>
-      <h1 id="titleLine">티에스코어 업무 기록</h1>
+      <h1 id="titleLine">티에스코어 작성 앱</h1>
       <div class="sub" id="subLine">불러오는 중…</div>
     </div>
     <button id="backupBtn" type="button">백업</button>
@@ -384,8 +384,8 @@
 
   <div class="card" id="weeklyImportWrap" style="display:none;">
     <h2>관리자 전용</h2>
-    <button class="btn btn-ghost" id="weeklyImportBtn" type="button">(1회) 과거 24주 데이터 가져오기</button>
-    <div class="small">2026년 4월 3주차 ~ 9월 3주차 기록을 한 번만 불러옵니다. 이미 가져온 주차는 다시 눌러도 덮어쓰지 않아요.</div>
+    <button class="btn btn-ghost" id="weeklyImportBtn" type="button">과거 24주 데이터 다시 가져오기</button>
+    <div class="small">2026년 4월 3주차 ~ 9월 3주차 기록은 화면을 열 때 자동으로 가져옵니다. 목록에 빠진 주차가 있을 때만 눌러보세요. 이미 가져온 주차는 덮어쓰지 않아요.</div>
   </div>
 
   <div class="card" style="padding:6px 12px 12px;">
@@ -397,7 +397,7 @@
     <button class="btn btn-ghost" id="weeklyExportAllBtn" type="button">전체 주차 모아서 저장</button>
   </div>
 
-  <div class="hint">로그인한 팀원이면 누구나 아무 칸이나 적고 고칠 수 있어요. 저장은 자동으로 됩니다.</div>
+  <div class="hint">로그인한 팀원이면 누구나 아무 칸이나 적고 고칠 수 있어요. 저장은 자동으로 됩니다.<br><span id="w_lastEdit"></span></div>
 </div>
 
 <div class="actionbar">
@@ -470,7 +470,7 @@ function migrateCats(){
 const KEY_SITES="gyeongbi_sites", KEY_CURSITE="gyeongbi_cursite";
 let sites=[], curSiteId=null;
 
-function saveSites(){ localStorage.setItem(KEY_SITES, JSON.stringify(sites)); if(typeof syncPush==="function") syncPush(); }
+function saveSites(){ if(READONLY) return; localStorage.setItem(KEY_SITES, JSON.stringify(sites)); if(typeof syncPush==="function") syncPush(); }
 function curSite(){ return sites.find(x=>x.id===curSiteId) || sites[0]; }
 
 function loadSites(){
@@ -502,6 +502,7 @@ siteSelect.onchange=()=>{
   stopEdit(); renderMonths(); render();
 };
 siteAdd.onclick=()=>{
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   const nm=prompt("새 현장 이름"); if(nm===null) return;
   const o={id:uid(), siteName:nm.trim(), dept:"", cardNumber:"", writer:""};
   sites.push(o); saveSites();
@@ -509,6 +510,7 @@ siteAdd.onclick=()=>{
   settings=o; renderSiteSelect(); siteSelect.onchange();
 };
 siteDel.onclick=()=>{
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   if(sites.length<=1){ alert("현장이 하나뿐이라 지울 수 없어요."); return; }
   const cnt=entries.filter(e=>e.siteId===curSiteId).length;
   if(!confirm('"'+(curSite().siteName||"이름 없는 현장")+'" 를 지울까요?\n'+
@@ -531,12 +533,13 @@ function load(){
   renderHeader(); renderMonths(); render();
 }
 function saveEntries(){
+  if(READONLY) return;
   entries.sort((a,b)=>a.date.localeCompare(b.date));
   try{ localStorage.setItem(KEY_E, JSON.stringify(entries)); }
   catch(e){ alert("저장 공간이 부족합니다. 백업 후 오래된 기록을 정리해주세요."); }
   if(typeof syncPush==="function") syncPush();
 }
-function saveSettings(){ localStorage.setItem(KEY_S, JSON.stringify(settings)); }
+function saveSettings(){ if(READONLY) return; localStorage.setItem(KEY_S, JSON.stringify(settings)); }
 
 function renderHeader(){
   titleLine.textContent = settings.siteName ? settings.siteName+" 경비대장" : "현장 경비 지출대장";
@@ -580,12 +583,14 @@ function render(){
   renderHeader();
   ledger.querySelectorAll('[data-act="del"]').forEach(b=>b.onclick=(ev)=>{
     ev.stopPropagation();
+    if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
     if(!confirm("이 기록을 삭제할까요?"))return;
     entries=entries.filter(x=>x.id!==b.dataset.id); saveEntries(); renderMonths(); render();
   });
   ledger.querySelectorAll('[data-act="edit"]').forEach(b=>b.onclick=()=>startEdit(b.dataset.id));
 }
 function startEdit(id){
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   const e=entries.find(x=>x.id===id); if(!e)return;
   editingId=id; f_date.value=e.date; writeCat(e.cat); f_vendor.value=e.vendor;
   f_amount.value=e.amount; f_note.value=e.note||""; setPay(e.pay);
@@ -615,6 +620,7 @@ function writeCat(v){
 }
 backupBtn.onclick=()=>{backupPanel.classList.toggle("open");};
 saveSettingsBtn.onclick=()=>{
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   const o=curSite();
   o.siteName=siteName.value.trim(); o.dept=dept.value.trim();
   o.cardNumber=cardNumber.value.trim(); o.writer=writer.value.trim();
@@ -623,6 +629,7 @@ saveSettingsBtn.onclick=()=>{
   setTimeout(()=>{saveSettingsBtn.textContent="저장";},1500);
 };
 addBtn.onclick=()=>{
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   const date=f_date.value, cat=readCat(), vendor=f_vendor.value.trim();
   const amount=Number(f_amount.value), note=f_note.value.trim();
   if(!date){alert("날짜를 입력해주세요.");return;}
@@ -765,7 +772,7 @@ let dEditingId = null;
 const KEY_VEH="gyeongbi_vehicles", KEY_CURVEH="gyeongbi_curveh";
 let vehicles=[], curVehId=null;
 
-function saveVehicles(){ localStorage.setItem(KEY_VEH, JSON.stringify(vehicles)); if(typeof syncPush==="function") syncPush(); }
+function saveVehicles(){ if(READONLY) return; localStorage.setItem(KEY_VEH, JSON.stringify(vehicles)); if(typeof syncPush==="function") syncPush(); }
 function curVeh(){ return vehicles.find(x=>x.id===curVehId) || vehicles[0]; }
 
 function loadVehicles(){
@@ -799,6 +806,7 @@ vehSelect.onchange=()=>{
   dSettings=curVeh(); fillVehForm(); dStopEdit(); dRenderMonths(); dRender();
 };
 vehAdd.onclick=()=>{
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   const no=prompt("새 차량의 자동차등록번호"); if(no===null) return;
   const o={id:uid(), carType:"", carNo:no.trim(), dept:"", name:"", odoBase:0};
   vehicles.push(o); saveVehicles();
@@ -806,6 +814,7 @@ vehAdd.onclick=()=>{
   dSettings=o; renderVehSelect(); vehSelect.onchange();
 };
 vehDel.onclick=()=>{
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   if(vehicles.length<=1){ alert("차량이 하나뿐이라 지울 수 없어요."); return; }
   const cnt=dEntries.filter(e=>e.vehId===curVehId && e.kind!=="fix").length;
   if(!confirm('"'+(curVeh().carNo||"번호 없는 차량")+'" 를 지울까요?\n'+
@@ -827,13 +836,14 @@ function dLoad(){
   dRenderMonths(); dRenderRoutes(); dRender();
 }
 function dSave(){
+  if(READONLY) return;
   dEntries.sort((a,b)=>a.date.localeCompare(b.date)||(a.seq-b.seq));
   try{ localStorage.setItem(KEY_D, JSON.stringify(dEntries)); }
   catch(e){ alert("저장 공간이 부족합니다."); }
   if(typeof syncPush==="function") syncPush();
 }
-function dSaveSettingsFn(){ localStorage.setItem(KEY_DS, JSON.stringify(dSettings)); }
-function dSaveRoutes(){ localStorage.setItem(KEY_DR, JSON.stringify(dRoutes)); if(typeof syncPush==="function") syncPush(); }
+function dSaveSettingsFn(){ if(READONLY) return; localStorage.setItem(KEY_DS, JSON.stringify(dSettings)); }
+function dSaveRoutes(){ if(READONLY) return; localStorage.setItem(KEY_DR, JSON.stringify(dRoutes)); if(typeof syncPush==="function") syncPush(); }
 
 // 계기판 누적 계산: 기준값에서 시작해 날짜순으로 거리를 더해 나감
 function dChain(){
@@ -879,6 +889,7 @@ function dRenderRoutes(){
   });
   routeList.querySelectorAll("[data-del]").forEach(b=>{
     b.onclick=()=>{
+      if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
       const i=+b.dataset.del;
       if(confirm('"'+dRoutes[i].name+'" 경로를 목록에서 지울까요?\n(이미 입력해둔 운행 기록은 그대로 남습니다)')){
         dRoutes.splice(i,1); dSaveRoutes(); dRenderRoutes();
@@ -886,6 +897,7 @@ function dRenderRoutes(){
     };
   });
   document.getElementById("routeAdd").onclick=()=>{
+    if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
     const name=prompt("경로 이름 (예: 본사-평택현장-본사)"); if(!name)return;
     const dist=Number(prompt("왕복 거리 (km)")); if(!dist||dist<=0){alert("거리를 숫자로 입력해주세요.");return;}
     const isWork=confirm("이 경로의 기본 용도는?\n\n[확인] 업무용\n[취소] 출퇴근용");
@@ -937,17 +949,20 @@ function dRender(){
     '<div class="line"><span>업무사용비율</span><span class="val">'+(tot?100:0)+'%</span></div>';
   dLedger.querySelectorAll('[data-act="dedit"]').forEach(b=>b.onclick=()=>dStartEdit(b.dataset.id));
   dLedger.querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>{
+    if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
     if(!confirm("이 계기판 보정을 취소할까요?\n계기판 숫자가 보정 전 값으로 되돌아갑니다."))return;
     dEntries=dEntries.filter(x=>x.id!==b.dataset.fix); dSave(); dRenderMonths(); dRender();
   });
   dLedger.querySelectorAll('[data-act="ddel"]').forEach(b=>b.onclick=(ev)=>{
     ev.stopPropagation();
+    if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
     if(!confirm("이 기록을 삭제할까요?"))return;
     dEntries=dEntries.filter(x=>x.id!==b.dataset.id); dSave(); dRenderMonths(); dRender();
   });
 }
 
 dSaveSettings.onclick=()=>{
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   const o=curVeh();
   o.carType=d_carType.value.trim(); o.carNo=d_carNo.value.trim();
   o.dept=d_dept.value.trim(); o.name=d_name.value.trim();
@@ -956,6 +971,7 @@ dSaveSettings.onclick=()=>{
   dSaveSettings.textContent="저장됨"; setTimeout(()=>{dSaveSettings.textContent="저장";},1500);
 };
 odoFixBtn.onclick=()=>{
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   const cur=dCurrentOdo();
   const v=prompt("지금 계기판에 표시된 숫자를 입력하세요 (km)\n앱이 아는 값: "+fmtWon(cur)+"\n기록될 날짜: "+(d_date.value||todayStr()), cur);
   if(v===null) return;
@@ -964,7 +980,7 @@ odoFixBtn.onclick=()=>{
   const hasTrip = dEntries.some(e=>e.vehId===curVehId && e.kind!=="fix");
   // 처음 쓰는 경우(시작값 없음) → 보정이 아니라 '시작 계기판'으로 저장
   if(!dSettings.odoBase && !hasTrip){
-    dSettings.odoBase=n; d_odoBase.value=n; dSaveSettingsFn(); dRender();
+    dSettings.odoBase=n; d_odoBase.value=n; saveVehicles(); dRender();
     alert("시작 계기판을 "+fmtWon(n)+"km 로 저장했습니다.\n앞으로는 거리만 입력하면 여기서부터 이어집니다.");
     return;
   }
@@ -1013,6 +1029,7 @@ dAddBtn.onclick=()=>{
   dSave(); dStopEdit(); dRenderMonths(); dMonthSelect.value=monthOf(date); dRender();
 };
 function dStartEdit(id){
+  if(READONLY){ alert("다른 직원의 기록은 수정할 수 없어요."); return; }
   const e=dEntries.find(x=>x.id===id);
   if(!e || e.kind==="fix") return;
   dEditingId=id;
@@ -1081,9 +1098,12 @@ function wMondayOf(d){
   const day = x.getDay();
   return wAddDays(x, day===0 ? -6 : 1-day);
 }
+// 회사 표기와 같게: 그 주의 목요일이 속한 달을 기준으로 "그 달의 몇 번째 주"
+// (예: 8/31(월) 시작 주 → 목요일이 9/3 이므로 9월 1주차, 9/14 시작 주 → 9월 3주차)
 function wLabelOf(monday){
-  const wom = Math.ceil(monday.getDate()/7);
-  return monday.getFullYear()+"년 "+wPad2(monday.getMonth()+1)+"월 "+wom+"주차";
+  const thu = wAddDays(monday, 3);
+  const wom = Math.ceil(thu.getDate()/7);
+  return thu.getFullYear()+"년 "+wPad2(thu.getMonth()+1)+"월 "+wom+"주차";
 }
 function wNewWeekDoc(weekId){
   const monday = new Date(weekId+"T00:00:00");
@@ -1131,8 +1151,15 @@ function wPush(){
   SYNC.pushWeekly(weekId, rest);
 }
 
+function wRenderLastEdit(){
+  if(!W || !W.updatedAt){ w_lastEdit.textContent=""; return; }
+  const d=new Date(W.updatedAt);
+  w_lastEdit.textContent = "마지막 수정: "+(W.updatedByName||"알 수 없음")+" · "+
+    (d.getMonth()+1)+"/"+d.getDate()+" "+wPad2(d.getHours())+":"+wPad2(d.getMinutes());
+}
 function wRenderAll(){
   if(!W) return;
+  wRenderLastEdit();
   wPopulateWeekSelect(W.weekId);
   w_label.value = W.label||"";
   w_dept.value = W.dept||"";
@@ -1257,29 +1284,61 @@ weekSelect.onchange = ()=>{ wOpenWeek(weekSelect.value); };
 async function wEnter(){
   weeklyDays.innerHTML = '<div class="small" style="padding:20px 4px;text-align:center;">불러오는 중…</div>';
   await wLoadWeekList();
+  // 과거 24주 데이터가 아직 안 들어와 있으면 자동으로 가져옴 (이미 가져온 주차는 건너뜀)
+  try{ await wImportSeed(); }catch(e){ console.error(e); }
   const startId = (W && W.weekId) || wFmtDate(wMondayOf(new Date()));
   await wOpenWeek(startId);
   weeklyImportWrap.style.display = (window.SYNC && SYNC.isAdmin) ? "block":"none";
 }
 
+// 과거 주차 데이터(엑셀에 있던 것)와, 앱에서 이미 만들어진 같은 주차를 합침
+// - 앱에서 이미 적어둔 칸은 그대로 두고, 비어있는 칸만 과거 데이터로 채움
+// - 주차 이름은 회사 표기(과거 데이터)로 바로잡음
+function wMergeSeed(ex, sd){
+  const members = sd.members.slice();
+  (ex.members||[]).forEach(n=>{ if(!members.includes(n)) members.push(n); });
+  const has = v => v!=null && String(v).trim()!=="";
+  const entries = {};
+  members.forEach(n=>{
+    const a=(sd.entries||{})[n]||[], b=(ex.entries||{})[n]||[];
+    entries[n] = sd.days.map((_,i)=> has(b[i]) ? b[i] : (a[i]||""));
+  });
+  const remarks = sd.days.map((_,i)=> has((ex.remarks||[])[i]) ? ex.remarks[i] : ((sd.remarks||[])[i]||""));
+  return {
+    weekStart: sd.weekStart, weekEnd: sd.weekEnd, label: sd.label, days: sd.days,
+    members, entries, remarks,
+    nextWeekPlan: has(ex.nextWeekPlan) ? ex.nextWeekPlan : (sd.nextWeekPlan||""),
+    dept: has(ex.dept) ? ex.dept : sd.dept,
+    reporter: has(ex.reporter) ? ex.reporter : sd.reporter,
+    imported: true
+  };
+}
+async function wImportSeed(){
+  if(!window.WEEKLY_SEED || !window.SYNC || !SYNC.user) return 0;
+  let n=0;
+  for(const sd of window.WEEKLY_SEED){
+    const ex = weekList.find(w=>w.weekId===sd.weekId);
+    if(ex && ex.imported) continue;                 // 이미 가져온 주차는 다시 건드리지 않음
+    const {weekId, ...seedRest} = sd;
+    const data = ex ? wMergeSeed(ex, sd) : seedRest;
+    await SYNC.db.collection("weeklyLogs").doc(weekId).set(
+      Object.assign({updatedAt:Date.now(), updatedBy:SYNC.user.uid,
+        updatedByName:(SYNC.user.email||"").split("@")[0]}, data), {merge:true});
+    n++;
+  }
+  if(n){
+    await wLoadWeekList();
+    if(W){ const cur=weekList.find(w=>w.weekId===W.weekId); if(cur && !isTypingNow()){ W=Object.assign({},cur); wRenderAll(); } }
+  }
+  return n;
+}
 weeklyImportBtn.onclick = async ()=>{
   if(!window.WEEKLY_SEED || !window.SYNC || !SYNC.user) return;
-  if(!confirm("과거 24주 데이터를 가져올까요?\n이미 있는 주차는 건드리지 않아요.")) return;
   weeklyImportBtn.disabled = true;
   try{
     await wLoadWeekList();
-    const have = new Set(weekList.map(w=>w.weekId));
-    let n=0;
-    for(const w of window.WEEKLY_SEED){
-      if(have.has(w.weekId)) continue;
-      const {weekId, ...rest} = w;
-      await SYNC.db.collection("weeklyLogs").doc(weekId).set(
-        Object.assign({updatedAt:Date.now(), updatedBy:SYNC.user.uid}, rest), {merge:true});
-      n++;
-    }
-    await wLoadWeekList();
-    wPopulateWeekSelect(W ? W.weekId : "");
-    alert(n+"개 주차를 새로 가져왔어요. (이미 있던 주차는 건너뜀)");
+    const n = await wImportSeed();
+    alert(n ? n+"개 주차를 가져왔어요." : "이미 모두 가져와져 있어요.");
   }catch(e){
     alert("가져오는 중 문제가 생겼어요. 인터넷 연결을 확인하고 다시 시도해주세요.");
   }
@@ -1314,7 +1373,7 @@ function showScreen(m){
   titleLine.textContent = m==="expense" ? "현장 경비 지출대장"
                         : m==="drive"   ? "차량 운행기록부"
                         : m==="weekly"  ? "주간업무일지"
-                        : "티에스코어 업무 기록";
+                        : "티에스코어 작성 앱";
   if(m==="expense"){ renderHeader(); render(); }
   if(m==="drive"){ dRender(); subLine.textContent = (dSettings.carNo? dSettings.carNo+" · ":"") + "총 "+dEntries.filter(e=>e.vehId===curVehId && e.kind!=="fix").length+"건 저장됨"; }
   if(m==="weekly"){ subLine.textContent = "팀 전체가 같이 보고 적어요"; }
@@ -1420,34 +1479,88 @@ function mergeById(a,b){
   (b||[]).forEach(x=>{ if(!m.has(x.id)) m.set(x.id,x); });
   return [...m.values()];
 }
+let wasViewing = false;      // 직전까지 다른 직원 기록을 보고 있었는지
+let pendingRemote = null;    // 입력 중이라 잠시 미뤄둔 서버 내용
+
+function isTypingNow(){
+  const a=document.activeElement;
+  return !!(a && (a.tagName==="INPUT" || a.tagName==="TEXTAREA") && !a.closest(".modal-bg"));
+}
+function readLocalArr(key){
+  try{ const v=JSON.parse(localStorage.getItem(key)||"[]"); return Array.isArray(v)? v : []; }
+  catch(e){ return []; }
+}
+// 남의 기록을 보다가 내 기록으로 돌아올 때, 메모리를 이 폰에 저장된 내 기록으로 되돌림
+function restoreLocalMine(){
+  sites=readLocalArr(KEY_SITES); entries=readLocalArr(KEY_E);
+  vehicles=readLocalArr(KEY_VEH); dEntries=readLocalArr(KEY_D); dRoutes=readLocalArr(KEY_DR);
+}
+
 function applyRemote(d, whoUid){
-  const mine = !SYNC.viewUid;
-  if(mine){
-    sites    = mergeById(d.sites, sites);
-    entries  = mergeById(d.entries, entries);
-    vehicles = mergeById(d.vehicles, vehicles);
-    dEntries = mergeById(d.dEntries, dEntries);
-    dRoutes  = (d.routes && d.routes.length) ? d.routes : dRoutes;
-  }else{
+  // 지금 화면이 가리키는 사람(남의 기록을 보는 중이면 그 사람, 아니면 나)의 문서가 아니면 무시
+  const target = SYNC.viewUid || (SYNC.user && SYNC.user.uid);
+  if(whoUid && target && whoUid!==target) return;
+
+  // 글자를 입력하는 중에 화면을 통째로 다시 그리면 입력이 사라지므로, 끝난 뒤에 반영
+  if(isTypingNow()){ pendingRemote=[d, whoUid]; return; }
+  pendingRemote=null;
+
+  const viewing = !!SYNC.viewUid;
+  let firstMerge=false;
+  if(viewing){
+    wasViewing=true;
     sites    = d.sites    || [];
     entries  = d.entries  || [];
     vehicles = d.vehicles || [];
     dEntries = d.dEntries || [];
     dRoutes  = d.routes   || [];
+  }else{
+    if(wasViewing){ wasViewing=false; restoreLocalMine(); }
+    if(SYNC.firstRemote){
+      // 로그인 직후 첫 동기화: 이 폰에 있던 기록과 서버 기록을 합침
+      SYNC.firstRemote=false; firstMerge=true;
+      sites    = mergeById(d.sites, sites);
+      entries  = mergeById(d.entries, entries);
+      vehicles = mergeById(d.vehicles, vehicles);
+      dEntries = mergeById(d.dEntries, dEntries);
+      dRoutes  = (d.routes && d.routes.length) ? d.routes : dRoutes;
+    }else{
+      // 그 이후에는 서버 내용을 그대로 따름 (다른 기기에서 고치거나 지운 것도 반영)
+      if(Array.isArray(d.sites))    sites    = d.sites;
+      if(Array.isArray(d.entries))  entries  = d.entries;
+      if(Array.isArray(d.vehicles)) vehicles = d.vehicles;
+      if(Array.isArray(d.dEntries)) dEntries = d.dEntries;
+      if(Array.isArray(d.routes))   dRoutes  = d.routes;
+    }
   }
   if(!sites.length)    sites=[{id:uid(),siteName:"",dept:"",cardNumber:"",writer:""}];
   if(!vehicles.length) vehicles=[{id:uid(),carType:"",carNo:"",dept:"",name:"",odoBase:0}];
-  localStorage.setItem(KEY_E, JSON.stringify(entries));
-  localStorage.setItem(KEY_D, JSON.stringify(dEntries));
-  saveSites(); saveVehicles(); dSaveRoutes();
+
+  // 내 기록일 때만 이 폰에 저장. (여기서 syncPush를 부르면 '받자마자 다시 올림'이 무한 반복됨)
+  if(!viewing){
+    localStorage.setItem(KEY_SITES, JSON.stringify(sites));
+    localStorage.setItem(KEY_E, JSON.stringify(entries));
+    localStorage.setItem(KEY_VEH, JSON.stringify(vehicles));
+    localStorage.setItem(KEY_D, JSON.stringify(dEntries));
+    localStorage.setItem(KEY_DR, JSON.stringify(dRoutes));
+  }
   curSiteId = sites.some(x=>x.id===curSiteId)? curSiteId : sites[0].id;
   curVehId  = vehicles.some(x=>x.id===curVehId)? curVehId : vehicles[0].id;
   settings=curSite(); dSettings=curVeh();
-  READONLY = !!SYNC.viewUid;
+  READONLY = viewing;
   roNotice.style.display = READONLY? "block":"none";
   renderSiteSelect(); renderMonths(); render();
   renderVehSelect(); fillVehForm(); dRenderMonths(); dRenderRoutes(); dRender();
+  if(firstMerge) syncPush();   // 합친 결과를 서버에도 한 번 올림
 }
+// 입력을 마치고 칸에서 벗어나면, 미뤄둔 서버 내용을 (내가 고친 게 없을 때만) 반영
+document.addEventListener("focusout", ()=>{
+  setTimeout(()=>{
+    if(!pendingRemote || isTypingNow()) return;
+    const p=pendingRemote; pendingRemote=null;
+    if(window.SYNC && !SYNC.isDirty()) applyRemote(p[0], p[1]);
+  }, 80);
+});
 function syncPush(){
   if(window.SYNC && SYNC.user && !SYNC.viewUid) SYNC.push(localSnapshot());
 }
@@ -1468,15 +1581,23 @@ function refreshLoginBar(){
     roNotice.style.display="none";
     deleteAcctWrap.style.display="none";
     READONLY=false;
+    adminListLoaded=false;
+    if(wasViewing){ wasViewing=false; load(); dLoad(); }   // 남의 기록을 보던 중 로그아웃 → 내 폰 기록으로 복귀
   }
 }
+let adminListLoaded = false;
 async function fillAdminUsers(){
-  try{
-    const list = await SYNC.listUsers();
-    adminUserSelect.innerHTML = list.map(u=>
-      '<option value="'+u.uid+'">'+esc(u.name||u.id)+(u.uid===SYNC.user.uid?" (나)":"")+'</option>').join("");
-    adminUserSelect.value = SYNC.user.uid;
-  }catch(e){ adminBar.style.display="none"; }
+  // 목록은 한 번만 불러오고, 이후에는 지금 보고 있는 사람으로 선택만 맞춤
+  // (매번 "나"로 되돌리면 다른 직원을 골라도 화면이 내 계정으로 돌아가 보임)
+  if(!adminListLoaded){
+    try{
+      const list = await SYNC.listUsers();
+      adminUserSelect.innerHTML = list.map(u=>
+        '<option value="'+u.uid+'">'+esc(u.name||u.id)+(u.uid===SYNC.user.uid?" (나)":"")+'</option>').join("");
+      adminListLoaded = true;
+    }catch(e){ adminBar.style.display="none"; return; }
+  }
+  adminUserSelect.value = SYNC.viewUid || SYNC.user.uid;
 }
 adminUserSelect.onchange=()=>{ SYNC.viewUser(adminUserSelect.value); };
 
