@@ -1627,7 +1627,7 @@ lgOk.onclick=async()=>{
   lgOk.disabled=true; lgMsg.textContent="잠시만요…";
   try{
     const ok = await SYNC.init();
-    if(!ok) throw new Error("연결 실패");
+    if(!ok) throw (SYNC.initError || new Error("연결 실패"));
     if(signupMode) await SYNC.signup(id, pw, lg_name.value.trim()||id);
     else           await SYNC.login(id, pw);
     localStorage.setItem("gyeongbi_hadlogin","1");
@@ -1641,7 +1641,8 @@ lgOk.onclick=async()=>{
       : c.includes("email-already-in-use") ? "이미 있는 아이디예요. 로그인해주세요."
       : c.includes("weak-password") ? "비밀번호가 너무 쉬워요. 6자 이상으로 해주세요."
       : c.includes("network") ? "인터넷 연결을 확인해주세요."
-      : "문제가 생겼어요. 잠시 후 다시 시도해주세요.";
+      // 분류 안 되는 오류는 원인 코드를 그대로 보여줌 (다음에 이 화면을 캡처해서 보내주시면 원인 파악이 쉬워짐)
+      : "문제가 생겼어요. 잠시 후 다시 시도해주세요. ("+(c||(e&&e.message)||"원인 불명")+")";
   }
   lgOk.disabled=false;
 };

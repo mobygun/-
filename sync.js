@@ -37,7 +37,11 @@
       S.auth = firebase.auth();
       S.db = firebase.firestore();
       try{ await S.db.enablePersistence({synchronizeTabs:true}); }catch(e){}
-      await S.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      // 일부 폰 브라우저(사생활 보호 모드, 카톡 내부창 등)는 로그인 상태를
+      // 저장해두는 기능 자체를 막아둠. 이게 막혀 있어도 로그인은 되게 함
+      // (그 대신 앱을 완전히 껐다 켜면 로그아웃돼 있을 수 있음).
+      try{ await S.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); }
+      catch(e){ try{ await S.auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); }catch(e2){} }
       S.auth.onAuthStateChanged(async (u)=>{
         S.user=u; S.isAdmin=false; S.viewUid=null;
         if(S.unsub){ S.unsub(); S.unsub=null; }
@@ -54,6 +58,7 @@
       return true;
     }catch(e){
       console.error(e);
+      S.initError = e;   // 로그인 화면에서 실제 원인을 보여줄 때 씀
       return false;
     }
   };
