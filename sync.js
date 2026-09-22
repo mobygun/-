@@ -166,7 +166,12 @@
   // 어드민: 전체 사용자 목록
   S.listUsers = async function(){
     const snap = await S.db.collection("users").get();
-    return snap.docs.map(d=>({uid:d.id, id:d.data().id||"", name:d.data().name||d.id}));
+    return snap.docs.map(d=>{
+      const v=d.data();
+      // 이름/아이디가 아예 없는(가입이 끝까지 안 된) 계정은 UID 대신 알아볼 수 있는 표시로
+      const label = v.name || v.id || ("(이름 없음 · "+d.id.slice(0,6)+")");
+      return {uid:d.id, id:v.id||"", name:label};
+    });
   };
   // 어드민: 특정 사용자 기록 보기
   S.viewUser = async function(uid){
