@@ -1,7 +1,7 @@
 /* 로그인 + 클라우드 동기화 (Firebase). 로그인하지 않으면 지금처럼 폰에만 저장됩니다. */
 (function(global){
   const CFG = {
-    apiKey: "AIzaSyBci4ypjpgYeQdjgwa0Ta_5yE4whWaRdFA",
+    apiKey: "AIzaSyBH05LPfRn5E2y5Uj2YJf21_GoGBRzoa20",
     authDomain: "tscore-app-c4a10.firebaseapp.com",
     projectId: "tscore-app-c4a10",
     storageBucket: "tscore-app-c4a10.firebasestorage.app",
